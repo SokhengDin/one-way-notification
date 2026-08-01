@@ -8,8 +8,8 @@
     "start": "bun src/index.ts"
   },
   "dependencies": {
-    "@effect/sql": "^0.52.1",
-    "@effect/sql-pg": "^0.53.0",
+    "@effect/platform-bun": "^4.0.0-beta.102",
+    "@effect/sql-pg": "^4.0.0-beta.102",
     "@repo/schema": "workspace:*",
     "effect": "^4.0.0-beta.102",
     "zod": "^4.4.3"

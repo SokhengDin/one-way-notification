@@ -12,7 +12,7 @@ const program = Effect.gen(function* () {
         hostname: config.db.host,
         port: config.db.port,
         database: config.db.name,
-        username: config.db.name,
+        username: config.db.user,
         password: Redacted.value(config.db.pass),
     });
 
@@ -30,7 +30,7 @@ const program = Effect.gen(function* () {
     const glob = new Bun.Glob("*sql");
     const files = [...glob.scanSync(MIGRATION_DIR)].sort();
 
-    for (const file in files) {
+    for (const file of files) {
         if (applied.has(file)) continue;
 
         const contents = yield* Effect.tryPromise(() => Bun.file(join(MIGRATION_DIR, file)).text());

@@ -9,7 +9,7 @@
   "scripts": {
     "dev:server": "bun run --filter server dev",
     "dev:web": "bun run --filter web dev",
-    "migrate": "bun run apps/server/db/migrate.ts"
+    "migrate": "bun --cwd=apps/server run db/migrate.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

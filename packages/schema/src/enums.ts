@@ -1,13 +1,15 @@
-import { z } from "zod";
+import { Schema } from "effect";
 
-export const channelType = z.enum(["email", "sms", "telegram"]);
-export type ChannelType = z.infer<typeof channelType>;
+export const CHANNEL_TYPES = ["email", "sms", "telegram"] as const;
+export type ChannelType = (typeof CHANNEL_TYPES)[number];
+export const channelTypeSchema = Schema.Literals(CHANNEL_TYPES);
 
-export const deliveryStatus = z.enum([
+export const DELIVERY_STATUSES = [
   "pending",
   "sent",
   "failed",
   "retrying",
   "skipped",
-]);
-export type DeliveryStatus = z.infer<typeof deliveryStatus>;
+] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+export const deliveryStatusSchema = Schema.Literals(DELIVERY_STATUSES);
