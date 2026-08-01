@@ -1,8 +1,16 @@
 {
   "name": "one-way-notification",
-  "module": "index.ts",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:server": "bun run --filter server dev",
+    "dev:web": "bun run --filter web dev",
+    "migrate": "bun run apps/server/db/migrate.ts"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
