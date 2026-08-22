@@ -7,8 +7,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:server": "bun run --filter server dev",
-    "dev:web": "bun run --filter web dev",
+    "dev:server": "bun --cwd=apps/server run dev",
+    "dev:web": "bun --cwd=apps/web run dev",
     "migrate": "bun --cwd=apps/server run db/migrate.ts"
   },
   "devDependencies": {

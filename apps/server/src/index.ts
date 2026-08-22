@@ -1,12 +1,20 @@
 import { Api } from "@repo/schema";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Logger } from "effect";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
 import { HttpRouter } from "effect/unstable/http";
 import { AppConfigLive, AppConfigService } from "./config/config";
 import { PgLive } from "./pg";
 import { UsersApiHandlers } from "./domain/users/users.http";
-import { SystemApiHandlers } from "./system.http";
+import { SystemApiHandlers } from "./domain/system/system.http";
+
+const LoggerLive = Logger.layer([
+  Logger.consolePretty({
+    colors: true,
+    mode: "tty",
+    formatDate: (date) => date.toLocaleTimeString(),
+  }),
+]);
 
 const ApiLive = HttpApiBuilder.layer(Api).pipe(
   Layer.provide([UsersApiHandlers, SystemApiHandlers]),
@@ -26,6 +34,7 @@ const BunHttpServerLive = Layer.unwrap(
 
 const HttpServerLive = HttpRouter.serve(AllRoutes).pipe(
   Layer.provide(BunHttpServerLive),
+  Layer.provide(LoggerLive),
 );
 
 BunRuntime.runMain(Layer.launch(HttpServerLive));

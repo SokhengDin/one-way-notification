@@ -5,12 +5,12 @@ import {
   UserContactRecord,
   UserPreferenceRecord,
   UserRecord,
-} from "../domain/users";
+} from "../users/users";
 import {
   UserContactConflict,
   UserContactNotFound,
   UserNotFound,
-} from "../domain/users.errors";
+} from "../users/users.errors";
 
 export class UsersApiGroup extends HttpApiGroup.make("users")
   .add(
