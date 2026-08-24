@@ -1,10 +1,13 @@
 import type { Effect } from "effect";
 import type {
   ChannelType,
+  UserContactConflict,
+  UserContactNotFound,
   UserContactRecord,
+  UserNotFound,
   UserPreferenceRecord,
   UserRecord,
-  UsersError,
+  UserRepoError,
 } from "@repo/schema";
 
 export interface AddUser {}
@@ -30,40 +33,91 @@ export interface UpdateUserContact {
 }
 
 export interface UserRepoService {
-  readonly addUser: (input: AddUser) => Effect.Effect<UserRecord>;
+  readonly addUser: (
+    input: AddUser,
+  ) => Effect.Effect<UserRecord, UserRepoError>;
 
-  readonly getUserById: (
+  readonly findUserById: (
     id: string,
-  ) => Effect.Effect<UserRecord, UsersError>;
+  ) => Effect.Effect<UserRecord | null, UserRepoError>;
 
-  readonly listUsers: () => Effect.Effect<ReadonlyArray<UserRecord>>;
+  readonly listUsers: () => Effect.Effect<
+    ReadonlyArray<UserRecord>,
+    UserRepoError
+  >;
 
-  readonly deleteUser: (id: string) => Effect.Effect<void, UsersError>;
+  readonly deleteUser: (id: string) => Effect.Effect<boolean, UserRepoError>;
 
   readonly listUserContacts: (
     userId: string,
-  ) => Effect.Effect<ReadonlyArray<UserContactRecord>>;
+  ) => Effect.Effect<ReadonlyArray<UserContactRecord>, UserRepoError>;
 
-  readonly getUserContact: (
+  readonly findUserContact: (
     userId: string,
     channel: ChannelType,
-  ) => Effect.Effect<UserContactRecord, UsersError>;
+  ) => Effect.Effect<UserContactRecord | null, UserRepoError>;
 
   readonly addUserContact: (
     input: AddUserContacts,
-  ) => Effect.Effect<UserContactRecord, UsersError>;
+  ) => Effect.Effect<UserContactRecord, UserRepoError | UserContactConflict>;
 
   readonly updateUserContact: (
     userId: string,
     channel: ChannelType,
     input: UpdateUserContact,
-  ) => Effect.Effect<UserContactRecord, UsersError>;
+  ) => Effect.Effect<UserContactRecord | null, UserRepoError>;
 
   readonly listUserPreferences: (
     userId: string,
-  ) => Effect.Effect<ReadonlyArray<UserPreferenceRecord>>;
+  ) => Effect.Effect<ReadonlyArray<UserPreferenceRecord>, UserRepoError>;
 
   readonly setUserPreference: (
     input: AddUserPreference,
-  ) => Effect.Effect<UserPreferenceRecord>;
+  ) => Effect.Effect<UserPreferenceRecord, UserRepoError>;
+}
+
+export interface UsersService {
+  readonly addUser: (
+    input: AddUser,
+  ) => Effect.Effect<UserRecord, UserRepoError>;
+
+  readonly getUserById: (
+    id: string,
+  ) => Effect.Effect<UserRecord, UserRepoError | UserNotFound>;
+
+  readonly listUsers: () => Effect.Effect<
+    ReadonlyArray<UserRecord>,
+    UserRepoError
+  >;
+
+  readonly deleteUser: (
+    id: string,
+  ) => Effect.Effect<void, UserRepoError | UserNotFound>;
+
+  readonly listUserContacts: (
+    userId: string,
+  ) => Effect.Effect<ReadonlyArray<UserContactRecord>, UserRepoError>;
+
+  readonly getUserContact: (
+    userId: string,
+    channel: ChannelType,
+  ) => Effect.Effect<UserContactRecord, UserRepoError | UserContactNotFound>;
+
+  readonly addUserContact: (
+    input: AddUserContacts,
+  ) => Effect.Effect<UserContactRecord, UserRepoError | UserContactConflict>;
+
+  readonly updateUserContact: (
+    userId: string,
+    channel: ChannelType,
+    input: UpdateUserContact,
+  ) => Effect.Effect<UserContactRecord, UserRepoError | UserContactNotFound>;
+
+  readonly listUserPreferences: (
+    userId: string,
+  ) => Effect.Effect<ReadonlyArray<UserPreferenceRecord>, UserRepoError>;
+
+  readonly setUserPreference: (
+    input: AddUserPreference,
+  ) => Effect.Effect<UserPreferenceRecord, UserRepoError>;
 }

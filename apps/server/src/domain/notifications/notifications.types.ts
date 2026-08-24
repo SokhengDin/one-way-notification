@@ -8,3 +8,4 @@ export interface CreateNotificationTemplate {
   readonly template: string;
   readonly subject: string;
 }
+

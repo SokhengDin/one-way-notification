@@ -1,5 +1,32 @@
 import { Schema } from "effect";
 
+export const UserRepoOperation = Schema.Literals([
+  "addUser",
+  "getUserById",
+  "listUsers",
+  "deleteUser",
+  "listUserContacts",
+  "getUserContact",
+  "addUserContact",
+  "updateUserContact",
+  "listUserPreferences",
+  "setUserPreference",
+]);
+
+export type UserRepoOperation = typeof UserRepoOperation.Type;
+
+export class UserRepoError extends Schema.TaggedErrorClass<UserRepoError>()(
+  "UserRepoError",
+  {
+    message: Schema.String,
+    operation: UserRepoOperation,
+    sqlState: Schema.optionalKey(Schema.String),
+    constraint: Schema.optionalKey(Schema.String),
+    cause: Schema.optionalKey(Schema.Defect()),
+  },
+  { httpApiStatus: 500 },
+) {}
+
 export class UserNotFound extends Schema.TaggedErrorClass<UserNotFound>()(
   "UserNotFound",
   {
@@ -23,15 +50,4 @@ export class UserContactConflict extends Schema.TaggedErrorClass<UserContactConf
     message: Schema.String,
   },
   { httpApiStatus: 409 },
-) {}
-
-export class UsersError extends Schema.TaggedErrorClass<UsersError>()(
-  "UsersError",
-  {
-    reason: Schema.Union([
-      UserNotFound,
-      UserContactNotFound,
-      UserContactConflict,
-    ]),
-  },
 ) {}
