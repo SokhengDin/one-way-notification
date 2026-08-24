@@ -1,4 +1,5 @@
 import {
+  makeMapSqlError,
   UserContactConflict,
   UserRepoError,
   type UserContactRecord,
@@ -8,8 +9,12 @@ import {
 } from "@repo/schema";
 import { Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
-import type { SqlError } from "effect/unstable/sql/SqlError";
 import type { UserRepoService } from "./users.types";
+
+const { toRepoError: toUserRepoError, mapSqlError } = makeMapSqlError<
+  UserRepoOperation,
+  UserRepoError
+>((fields) => new UserRepoError(fields), "Failed to query users");
 
 export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
   const addUser: UserRepoService["addUser"] = Effect.fn(
@@ -156,37 +161,4 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     listUserPreferences,
     setUserPreference,
   };
-}
-
-function toUserRepoError(
-  operation: UserRepoOperation,
-  error: SqlError,
-): UserRepoError {
-  const cause = error.reason.cause;
-  const sqlState = stringProperty(cause, "code");
-  const constraint = stringProperty(cause, "constraint");
-  return new UserRepoError({
-    message: "Failed to query users",
-    operation,
-    ...(sqlState === undefined ? {} : { sqlState }),
-    ...(constraint === undefined ? {} : { constraint }),
-    cause: error,
-  });
-}
-
-function mapSqlError<A>(operation: UserRepoOperation) {
-  return (
-    effect: Effect.Effect<A, SqlError>,
-  ): Effect.Effect<A, UserRepoError> =>
-    effect.pipe(
-      Effect.mapError((error) => toUserRepoError(operation, error)),
-    );
-}
-
-function stringProperty(value: unknown, key: string): string | undefined {
-  if (typeof value !== "object" || value === null || !(key in value)) {
-    return undefined;
-  }
-  const prop = (value as Record<string, unknown>)[key];
-  return typeof prop === "string" ? prop : undefined;
 }

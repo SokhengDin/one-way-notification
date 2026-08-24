@@ -6,6 +6,7 @@ import { HttpRouter } from "effect/unstable/http";
 import { AppConfigLive, AppConfigService } from "./config/config";
 import { PgLive } from "./pg";
 import { UsersApiHandlers } from "./domain/users/users.http";
+import { NotificationsApiHandlers } from "./domain/notifications/notifications.http";
 import { SystemApiHandlers } from "./domain/system/system.http";
 
 const LoggerLive = Logger.layer([
@@ -17,7 +18,7 @@ const LoggerLive = Logger.layer([
 ]);
 
 const ApiLive = HttpApiBuilder.layer(Api).pipe(
-  Layer.provide([UsersApiHandlers, SystemApiHandlers]),
+  Layer.provide([UsersApiHandlers, NotificationsApiHandlers, SystemApiHandlers]),
   Layer.provide(PgLive),
 );
 

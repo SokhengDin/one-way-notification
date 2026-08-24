@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 
-export const CHANNEL_TYPES = ["email", "sms", "telegram"] as const;
-export type ChannelType = (typeof CHANNEL_TYPES)[number];
+export const CHANNEL_TYPES     = ["email", "sms", "telegram"] as const;
+export type ChannelType        = (typeof CHANNEL_TYPES)[number];
 export const channelTypeSchema = Schema.Literals(CHANNEL_TYPES);
 
 export const DELIVERY_STATUSES = [
