@@ -12,20 +12,21 @@ import {
   UserNotFound,
   UserRepoError,
 } from "../users/users.errors";
+import { ApiResponse } from "./response";
 
 export class UsersApiGroup extends HttpApiGroup.make("users")
   .add(
     HttpApiEndpoint.get("listUsers", "/", {
-      success: Schema.Array(UserRecord),
+      success: ApiResponse(Schema.Array(UserRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.post("addUser", "/", {
-      success: UserRecord,
+      success: ApiResponse(UserRecord),
       error: UserRepoError,
     }),
     HttpApiEndpoint.get("getUserById", "/:id", {
       params: { id: Schema.String },
-      success: UserRecord,
+      success: ApiResponse(UserRecord),
       error: [UserNotFound, UserRepoError],
     }),
     HttpApiEndpoint.make("DELETE")("deleteUser", "/:id", {
@@ -35,7 +36,7 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
     }),
     HttpApiEndpoint.get("listUserContacts", "/:id/contacts", {
       params: { id: Schema.String },
-      success: Schema.Array(UserContactRecord),
+      success: ApiResponse(Schema.Array(UserContactRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.post("addUserContact", "/:id/contacts", {
@@ -46,12 +47,12 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
         linked: Schema.Boolean,
         verified: Schema.Boolean,
       }),
-      success: UserContactRecord,
+      success: ApiResponse(UserContactRecord),
       error: [UserContactConflict, UserRepoError],
     }),
     HttpApiEndpoint.get("getUserContact", "/:id/contacts/:channel", {
       params: { id: Schema.String, channel: channelTypeSchema },
-      success: UserContactRecord,
+      success: ApiResponse(UserContactRecord),
       error: [UserContactNotFound, UserRepoError],
     }),
     HttpApiEndpoint.patch("updateUserContact", "/:id/contacts/:channel", {
@@ -61,12 +62,12 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
         linked: Schema.optional(Schema.Boolean),
         verified: Schema.optional(Schema.Boolean),
       }),
-      success: UserContactRecord,
+      success: ApiResponse(UserContactRecord),
       error: [UserContactNotFound, UserRepoError],
     }),
     HttpApiEndpoint.get("listUserPreferences", "/:id/preferences", {
       params: { id: Schema.String },
-      success: Schema.Array(UserPreferenceRecord),
+      success: ApiResponse(Schema.Array(UserPreferenceRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.put("setUserPreference", "/:id/preferences", {
@@ -75,9 +76,9 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
         channel: channelTypeSchema,
         enabled: Schema.Boolean,
       }),
-      success: UserPreferenceRecord,
+      success: ApiResponse(UserPreferenceRecord),
       error: UserRepoError,
     }),
   )
-  .prefix("/user")
+  .prefix("/api/user")
 {}

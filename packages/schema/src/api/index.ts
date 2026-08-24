@@ -4,7 +4,7 @@ import { UsersApiGroup } from "./users";
 export class SystemApiGroup extends HttpApiGroup.make("system", {
   topLevel: true,
 }).add(
-  HttpApiEndpoint.get("health", "/health", {
+  HttpApiEndpoint.get("health", "/api/health", {
     success: HttpApiSchema.NoContent,
   }),
 ) {}
