@@ -1,11 +1,12 @@
 import {
   ExternalSystemConflict,
+  ExternalSystemRecord,
   ExternalSystemRepoError,
   ExternalUserLinkConflict,
+  ExternalUserLinkRecord,
   makeMapSqlError,
-  type ExternalSystemRecord,
+  normalizePagination,
   type ExternalSystemRepoOperation,
-  type ExternalUserLinkRecord,
 } from "@repo/schema";
 import { Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
@@ -56,13 +57,28 @@ export function makeSqlExternalSystemsRepo(
     });
 
   const listExternalSystems: ExternalSystemRepoService["listExternalSystems"] =
-    Effect.fn("ExternalSystemsRepo.listExternalSystems")(function* () {
-      return yield* sql<ExternalSystemRecord>`
-        SELECT id, name, api_key, created_at, updated_at, deleted_at
+    Effect.fn("ExternalSystemsRepo.listExternalSystems")(function* (input) {
+      const { skip, limit } = normalizePagination(input);
+      const namePattern = input.name ? `%${input.name}%` : null;
+
+      const rows = yield* sql<
+        ExternalSystemRecord & { readonly total_count: number }
+      >`
+        SELECT id, name, api_key, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM external_systems
         WHERE deleted_at IS NULL
+          AND (${namePattern}::text IS NULL OR name ILIKE ${namePattern})
         ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listExternalSystems"));
+
+      return {
+        items: rows.map((row) => new ExternalSystemRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   const updateExternalSystem: ExternalSystemRepoService["updateExternalSystem"] =
@@ -137,13 +153,27 @@ export function makeSqlExternalSystemsRepo(
   const listExternalUserLinksByUser: ExternalSystemRepoService["listExternalUserLinksByUser"] =
     Effect.fn("ExternalSystemsRepo.listExternalUserLinksByUser")(function* (
       userId,
+      input,
     ) {
-      return yield* sql<ExternalUserLinkRecord>`
-        SELECT id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        ExternalUserLinkRecord & { readonly total_count: number }
+      >`
+        SELECT id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM external_user_links
         WHERE user_id = ${userId} AND deleted_at IS NULL
         ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listExternalUserLinksByUser"));
+
+      return {
+        items: rows.map((row) => new ExternalUserLinkRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   const deleteExternalUserLink: ExternalSystemRepoService["deleteExternalUserLink"] =

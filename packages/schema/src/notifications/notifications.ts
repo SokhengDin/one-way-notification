@@ -10,9 +10,9 @@ export class NotificationTemplateRecord extends Schema.Class<NotificationTemplat
   channel: channelTypeSchema,
   template: Schema.String,
   subject: Schema.NullOr(Schema.String),
-  created_at: Schema.String,
-  updated_at: Schema.String,
-  deleted_at: Schema.NullOr(Schema.String),
+  created_at: Schema.Date,
+  updated_at: Schema.Date,
+  deleted_at: Schema.NullOr(Schema.Date)
 }) {}
 
 export class NotificationRecord extends Schema.Class<NotificationRecord>(
@@ -40,7 +40,7 @@ export class NotificationDeliveryRecord extends Schema.Class<NotificationDeliver
   attempt_count: Schema.Int,
   last_error: Schema.NullOr(Schema.String),
   sent_at: Schema.NullOr(Schema.String),
-  created_at: Schema.String,
-  updated_at: Schema.NullOr(Schema.String),
-  deleted_at: Schema.NullOr(Schema.String),
+  created_at: Schema.Date,
+  updated_at: Schema.NullOr(Schema.Date),
+  deleted_at: Schema.NullOr(Schema.Date),
 }) {}

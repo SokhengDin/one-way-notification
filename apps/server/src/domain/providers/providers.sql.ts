@@ -1,10 +1,11 @@
 import {
   ChannelProviderConflict,
+  ChannelProviderRecord,
   makeMapSqlError,
+  normalizePagination,
   ProviderRepoError,
-  type ChannelProviderRecord,
+  ProviderUsageLogRecord,
   type ProviderRepoOperation,
-  type ProviderUsageLogRecord,
 } from "@repo/schema";
 import { Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
@@ -37,7 +38,7 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
         ),
       );
 
-      return rows[0]!;
+      return new ChannelProviderRecord(rows[0]!);
     });
 
   const findChannelProviderById: ProviderRepoService["findChannelProviderById"] =
@@ -48,17 +49,31 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
         WHERE id = ${id} AND deleted_at IS NULL
       `.pipe(mapSqlError("findChannelProviderById"));
 
-      return rows[0] ?? null;
+      const row = rows[0];
+      return row ? new ChannelProviderRecord(row) : null;
     });
 
   const listChannelProviders: ProviderRepoService["listChannelProviders"] =
-    Effect.fn("ProvidersRepo.listChannelProviders")(function* () {
-      return yield* sql<ChannelProviderRecord>`
-        SELECT id, channel, name, is_active, created_at, updated_at, deleted_at
+    Effect.fn("ProvidersRepo.listChannelProviders")(function* (input) {
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        ChannelProviderRecord & { readonly total_count: number }
+      >`
+        SELECT id, channel, name, is_active, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM channel_providers
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listChannelProviders"));
+
+      return {
+        items: rows.map((row) => new ChannelProviderRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   const updateChannelProvider: ProviderRepoService["updateChannelProvider"] =
@@ -84,7 +99,8 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
         ),
       );
 
-      return rows[0] ?? null;
+      const row = rows[0];
+      return row ? new ChannelProviderRecord(row) : null;
     });
 
   const deleteChannelProvider: ProviderRepoService["deleteChannelProvider"] =
@@ -109,19 +125,33 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
         RETURNING id, delivery_id, provider_id, provider_ref_id, status_code, cost, raw_response, attempted_at
       `.pipe(mapSqlError("addProviderUsageLog"));
 
-      return rows[0]!;
+      return new ProviderUsageLogRecord(rows[0]!);
     });
 
   const listProviderUsageLogByDelivery: ProviderRepoService["listProviderUsageLogByDelivery"] =
     Effect.fn("ProvidersRepo.listProviderUsageLogByDelivery")(function* (
       deliveryId,
+      input,
     ) {
-      return yield* sql<ProviderUsageLogRecord>`
-        SELECT id, delivery_id, provider_id, provider_ref_id, status_code, cost, raw_response, attempted_at
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        ProviderUsageLogRecord & { readonly total_count: number }
+      >`
+        SELECT id, delivery_id, provider_id, provider_ref_id, status_code, cost, raw_response, attempted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM provider_usage_log
         WHERE delivery_id = ${deliveryId}
         ORDER BY attempted_at ASC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listProviderUsageLogByDelivery"));
+
+      return {
+        items: rows.map((row) => new ProviderUsageLogRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   return {

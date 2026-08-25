@@ -11,6 +11,7 @@ import {
   ExternalUserLinkConflict,
   ExternalUserLinkNotFound,
 } from "../external-systems/external-systems.errors";
+import { PaginatedData, PaginationQuery } from "../shared/pagination";
 import { ApiResponse } from "./response";
 
 export class ExternalSystemsApiGroup extends HttpApiGroup.make(
@@ -19,7 +20,11 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
   .add(
     // ---------- external_systems ----------
     HttpApiEndpoint.get("listExternalSystems", "/external-system", {
-      success: ApiResponse(Schema.Array(ExternalSystemRecord)),
+      query: {
+        ...PaginationQuery,
+        name: Schema.optional(Schema.String),
+      },
+      success: ApiResponse(PaginatedData(ExternalSystemRecord)),
       error: ExternalSystemRepoError,
     }),
     HttpApiEndpoint.post("addExternalSystem", "/external-system", {
@@ -64,7 +69,8 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       "/external-system/user/:userId/link",
       {
         params: { userId: Schema.String },
-        success: ApiResponse(Schema.Array(ExternalUserLinkRecord)),
+        query: PaginationQuery,
+        success: ApiResponse(PaginatedData(ExternalUserLinkRecord)),
         error: ExternalSystemRepoError,
       },
     ),

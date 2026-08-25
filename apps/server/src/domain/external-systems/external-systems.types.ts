@@ -7,6 +7,8 @@ import type {
   ExternalUserLinkConflict,
   ExternalUserLinkNotFound,
   ExternalUserLinkRecord,
+  PaginatedResult,
+  PaginationInput,
 } from "@repo/schema";
 
 // ---------- external_systems ----------
@@ -19,6 +21,10 @@ export interface AddExternalSystem {
 export interface UpdateExternalSystem {
   readonly name?: string;
   readonly api_key?: string;
+}
+
+export interface ListExternalSystemsInput extends PaginationInput {
+  readonly name?: string;
 }
 
 // ---------- external_user_links ----------
@@ -42,8 +48,10 @@ export interface ExternalSystemRepoService {
     id: string,
   ) => Effect.Effect<ExternalSystemRecord | null, ExternalSystemRepoError>;
 
-  readonly listExternalSystems: () => Effect.Effect<
-    ReadonlyArray<ExternalSystemRecord>,
+  readonly listExternalSystems: (
+    input: ListExternalSystemsInput,
+  ) => Effect.Effect<
+    PaginatedResult<ExternalSystemRecord>,
     ExternalSystemRepoError
   >;
 
@@ -69,8 +77,9 @@ export interface ExternalSystemRepoService {
 
   readonly listExternalUserLinksByUser: (
     userId: string,
+    input: PaginationInput,
   ) => Effect.Effect<
-    ReadonlyArray<ExternalUserLinkRecord>,
+    PaginatedResult<ExternalUserLinkRecord>,
     ExternalSystemRepoError
   >;
 
@@ -95,8 +104,10 @@ export interface ExternalSystemsService {
     ExternalSystemRepoError | ExternalSystemNotFound
   >;
 
-  readonly listExternalSystems: () => Effect.Effect<
-    ReadonlyArray<ExternalSystemRecord>,
+  readonly listExternalSystems: (
+    input: ListExternalSystemsInput,
+  ) => Effect.Effect<
+    PaginatedResult<ExternalSystemRecord>,
     ExternalSystemRepoError
   >;
 
@@ -125,8 +136,9 @@ export interface ExternalSystemsService {
 
   readonly listExternalUserLinksByUser: (
     userId: string,
+    input: PaginationInput,
   ) => Effect.Effect<
-    ReadonlyArray<ExternalUserLinkRecord>,
+    PaginatedResult<ExternalUserLinkRecord>,
     ExternalSystemRepoError
   >;
 

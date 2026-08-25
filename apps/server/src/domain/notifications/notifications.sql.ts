@@ -1,12 +1,13 @@
 import {
   makeMapSqlError,
   NotificationConflict,
+  NotificationDeliveryRecord,
+  normalizePagination,
+  NotificationRecord,
   NotificationRepoError,
   NotificationTemplateConflict,
-  type NotificationDeliveryRecord,
-  type NotificationRecord,
+  NotificationTemplateRecord,
   type NotificationRepoOperation,
-  type NotificationTemplateRecord,
 } from "@repo/schema";
 import { Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
@@ -43,7 +44,7 @@ export function makeSqlNotificationRepo(
         ),
       );
 
-      return rows[0]!;
+      return new NotificationTemplateRecord(rows[0]!);
     });
 
   const findNotificationTemplateById: NotificationRepoService["findNotificationTemplateById"] =
@@ -56,17 +57,33 @@ export function makeSqlNotificationRepo(
         WHERE id = ${id} AND deleted_at IS NULL
       `.pipe(mapSqlError("findNotificationTemplateById"));
 
-      return rows[0] ?? null;
+      const row = rows[0];
+      return row ? new NotificationTemplateRecord(row) : null;
     });
 
   const listNotificationTemplates: NotificationRepoService["listNotificationTemplates"] =
-    Effect.fn("NotificationsRepo.listNotificationTemplates")(function* () {
-      return yield* sql<NotificationTemplateRecord>`
-        SELECT id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at
+    Effect.fn("NotificationsRepo.listNotificationTemplates")(function* (
+      input,
+    ) {
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        NotificationTemplateRecord & { readonly total_count: number }
+      >`
+        SELECT id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM notification_templates
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listNotificationTemplates"));
+
+      return {
+        items: rows.map((row) => new NotificationTemplateRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   const updateNotificationTemplate: NotificationRepoService["updateNotificationTemplate"] =
@@ -84,7 +101,8 @@ export function makeSqlNotificationRepo(
         RETURNING id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at
       `.pipe(mapSqlError("updateNotificationTemplate"));
 
-      return rows[0] ?? null;
+      const row = rows[0];
+      return row ? new NotificationTemplateRecord(row) : null;
     });
 
   const deleteNotificationTemplate: NotificationRepoService["deleteNotificationTemplate"] =
@@ -113,9 +131,12 @@ export function makeSqlNotificationRepo(
       `.pipe(mapSqlError("addNotification"));
 
       if (rows[0]) {
-        return rows[0];
+        return new NotificationRecord(rows[0]);
       }
 
+      // Insert hit the idempotency conflict (DO NOTHING returned no row) —
+      // this is a replay of an already-processed request, so return the
+      // existing notification instead of erroring.
       const existing = yield* sql<NotificationRecord>`
         SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
         FROM notifications
@@ -130,7 +151,7 @@ export function makeSqlNotificationRepo(
         );
       }
 
-      return existing[0];
+      return new NotificationRecord(existing[0]);
     });
 
   const findNotificationById: NotificationRepoService["findNotificationById"] =
@@ -141,17 +162,31 @@ export function makeSqlNotificationRepo(
         WHERE id = ${id} AND deleted_at IS NULL
       `.pipe(mapSqlError("findNotificationById"));
 
-      return rows[0] ?? null;
+      const row = rows[0];
+      return row ? new NotificationRecord(row) : null;
     });
 
   const listNotifications: NotificationRepoService["listNotifications"] =
-    Effect.fn("NotificationsRepo.listNotifications")(function* () {
-      return yield* sql<NotificationRecord>`
-        SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
+    Effect.fn("NotificationsRepo.listNotifications")(function* (input) {
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        NotificationRecord & { readonly total_count: number }
+      >`
+        SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM notifications
         WHERE deleted_at IS NULL
         ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listNotifications"));
+
+      return {
+        items: rows.map((row) => new NotificationRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   // ---------- notification_deliveries ----------
@@ -159,13 +194,27 @@ export function makeSqlNotificationRepo(
   const listNotificationDeliveries: NotificationRepoService["listNotificationDeliveries"] =
     Effect.fn("NotificationsRepo.listNotificationDeliveries")(function* (
       notificationId,
+      input,
     ) {
-      return yield* sql<NotificationDeliveryRecord>`
-        SELECT id, notification_id, channel, provider_id, status, attempt_count, last_error, sent_at, created_at, updated_at, deleted_at
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        NotificationDeliveryRecord & { readonly total_count: number }
+      >`
+        SELECT id, notification_id, channel, provider_id, status, attempt_count, last_error, sent_at, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
         FROM notification_deliveries
         WHERE notification_id = ${notificationId} AND deleted_at IS NULL
         ORDER BY created_at ASC
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listNotificationDeliveries"));
+
+      return {
+        items: rows.map((row) => new NotificationDeliveryRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   const updateNotificationDeliveryStatus: NotificationRepoService["updateNotificationDeliveryStatus"] =
@@ -183,7 +232,8 @@ export function makeSqlNotificationRepo(
           RETURNING id, notification_id, channel, provider_id, status, attempt_count, last_error, sent_at, created_at, updated_at, deleted_at
         `.pipe(mapSqlError("updateNotificationDeliveryStatus"));
 
-        return rows[0] ?? null;
+        const row = rows[0];
+        return row ? new NotificationDeliveryRecord(row) : null;
       },
     );
 

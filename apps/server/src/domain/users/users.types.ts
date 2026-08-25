@@ -1,6 +1,8 @@
 import type { Effect } from "effect";
 import type {
   ChannelType,
+  PaginatedResult,
+  PaginationInput,
   UserContactConflict,
   UserContactNotFound,
   UserContactRecord,
@@ -41,16 +43,16 @@ export interface UserRepoService {
     id: string,
   ) => Effect.Effect<UserRecord | null, UserRepoError>;
 
-  readonly listUsers: () => Effect.Effect<
-    ReadonlyArray<UserRecord>,
-    UserRepoError
-  >;
+  readonly listUsers: (
+    input: PaginationInput,
+  ) => Effect.Effect<PaginatedResult<UserRecord>, UserRepoError>;
 
   readonly deleteUser: (id: string) => Effect.Effect<boolean, UserRepoError>;
 
   readonly listUserContacts: (
     userId: string,
-  ) => Effect.Effect<ReadonlyArray<UserContactRecord>, UserRepoError>;
+    input: PaginationInput,
+  ) => Effect.Effect<PaginatedResult<UserContactRecord>, UserRepoError>;
 
   readonly findUserContact: (
     userId: string,
@@ -69,7 +71,8 @@ export interface UserRepoService {
 
   readonly listUserPreferences: (
     userId: string,
-  ) => Effect.Effect<ReadonlyArray<UserPreferenceRecord>, UserRepoError>;
+    input: PaginationInput,
+  ) => Effect.Effect<PaginatedResult<UserPreferenceRecord>, UserRepoError>;
 
   readonly setUserPreference: (
     input: AddUserPreference,
@@ -85,10 +88,9 @@ export interface UsersService {
     id: string,
   ) => Effect.Effect<UserRecord, UserRepoError | UserNotFound>;
 
-  readonly listUsers: () => Effect.Effect<
-    ReadonlyArray<UserRecord>,
-    UserRepoError
-  >;
+  readonly listUsers: (
+    input: PaginationInput,
+  ) => Effect.Effect<PaginatedResult<UserRecord>, UserRepoError>;
 
   readonly deleteUser: (
     id: string,
@@ -96,7 +98,8 @@ export interface UsersService {
 
   readonly listUserContacts: (
     userId: string,
-  ) => Effect.Effect<ReadonlyArray<UserContactRecord>, UserRepoError>;
+    input: PaginationInput,
+  ) => Effect.Effect<PaginatedResult<UserContactRecord>, UserRepoError>;
 
   readonly getUserContact: (
     userId: string,
@@ -115,7 +118,8 @@ export interface UsersService {
 
   readonly listUserPreferences: (
     userId: string,
-  ) => Effect.Effect<ReadonlyArray<UserPreferenceRecord>, UserRepoError>;
+    input: PaginationInput,
+  ) => Effect.Effect<PaginatedResult<UserPreferenceRecord>, UserRepoError>;
 
   readonly setUserPreference: (
     input: AddUserPreference,

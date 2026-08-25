@@ -11,6 +11,8 @@ import type {
   NotificationTemplateConflict,
   NotificationTemplateNotFound,
   NotificationTemplateRecord,
+  PaginatedResult,
+  PaginationInput,
 } from "@repo/schema";
 
 // ---------- notification_templates ----------
@@ -58,8 +60,10 @@ export interface NotificationRepoService {
     id: string,
   ) => Effect.Effect<NotificationTemplateRecord | null, NotificationRepoError>;
 
-  readonly listNotificationTemplates: () => Effect.Effect<
-    ReadonlyArray<NotificationTemplateRecord>,
+  readonly listNotificationTemplates: (
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<NotificationTemplateRecord>,
     NotificationRepoError
   >;
 
@@ -84,16 +88,19 @@ export interface NotificationRepoService {
     id: string,
   ) => Effect.Effect<NotificationRecord | null, NotificationRepoError>;
 
-  readonly listNotifications: () => Effect.Effect<
-    ReadonlyArray<NotificationRecord>,
+  readonly listNotifications: (
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<NotificationRecord>,
     NotificationRepoError
   >;
 
   // notification_deliveries
   readonly listNotificationDeliveries: (
     notificationId: string,
+    input: PaginationInput,
   ) => Effect.Effect<
-    ReadonlyArray<NotificationDeliveryRecord>,
+    PaginatedResult<NotificationDeliveryRecord>,
     NotificationRepoError
   >;
 
@@ -123,8 +130,10 @@ export interface NotificationsService {
     NotificationRepoError | NotificationTemplateNotFound
   >;
 
-  readonly listNotificationTemplates: () => Effect.Effect<
-    ReadonlyArray<NotificationTemplateRecord>,
+  readonly listNotificationTemplates: (
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<NotificationTemplateRecord>,
     NotificationRepoError
   >;
 
@@ -158,16 +167,19 @@ export interface NotificationsService {
     NotificationRepoError | NotificationNotFound
   >;
 
-  readonly listNotifications: () => Effect.Effect<
-    ReadonlyArray<NotificationRecord>,
+  readonly listNotifications: (
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<NotificationRecord>,
     NotificationRepoError
   >;
 
   // notification_deliveries
   readonly listNotificationDeliveries: (
     notificationId: string,
+    input: PaginationInput,
   ) => Effect.Effect<
-    ReadonlyArray<NotificationDeliveryRecord>,
+    PaginatedResult<NotificationDeliveryRecord>,
     NotificationRepoError
   >;
 

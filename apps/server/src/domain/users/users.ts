@@ -46,8 +46,8 @@ export class Users extends Context.Service<Users, UsersService>()(
 
       const listUsers: UsersService["listUsers"] = Effect.fn(
         "Users.listUsers",
-      )(function* () {
-        return yield* repo.listUsers();
+      )(function* (input) {
+        return yield* repo.listUsers(input);
       });
 
       const deleteUser: UsersService["deleteUser"] = Effect.fn(
@@ -61,8 +61,8 @@ export class Users extends Context.Service<Users, UsersService>()(
 
       const listUserContacts: UsersService["listUserContacts"] = Effect.fn(
         "Users.listUserContacts",
-      )(function* (userId) {
-        return yield* repo.listUserContacts(userId);
+      )(function* (userId, input) {
+        return yield* repo.listUserContacts(userId, input);
       });
 
       const getUserContact: UsersService["getUserContact"] = Effect.fn(
@@ -96,8 +96,8 @@ export class Users extends Context.Service<Users, UsersService>()(
       });
 
       const listUserPreferences: UsersService["listUserPreferences"] =
-        Effect.fn("Users.listUserPreferences")(function* (userId) {
-          return yield* repo.listUserPreferences(userId);
+        Effect.fn("Users.listUserPreferences")(function* (userId, input) {
+          return yield* repo.listUserPreferences(userId, input);
         });
 
       const setUserPreference: UsersService["setUserPreference"] = Effect.fn(

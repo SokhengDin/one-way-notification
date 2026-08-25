@@ -10,7 +10,7 @@ export const UsersApiHandlers = HttpApiBuilder.group(
     const users = yield* Users;
 
     return handlers
-      .handle("listUsers", () => users.listUsers().pipe(Effect.map((data) => ok(data))))
+      .handle("listUsers", ({ query }) => users.listUsers(query).pipe(Effect.map((data) => ok(data))))
       .handle("addUser", () =>
         users.addUser({}).pipe(Effect.map((data) => ok(data, 201, "Created"))),
       )
@@ -18,8 +18,10 @@ export const UsersApiHandlers = HttpApiBuilder.group(
         users.getUserById(params.id).pipe(Effect.map((data) => ok(data))),
       )
       .handle("deleteUser", ({ params }) => users.deleteUser(params.id))
-      .handle("listUserContacts", ({ params }) =>
-        users.listUserContacts(params.id).pipe(Effect.map((data) => ok(data))),
+      .handle("listUserContacts", ({ params, query }) =>
+        users
+          .listUserContacts(params.id, query)
+          .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addUserContact", ({ params, payload }) =>
         users
@@ -40,9 +42,9 @@ export const UsersApiHandlers = HttpApiBuilder.group(
           )
           .pipe(Effect.map((data) => ok(data))),
       )
-      .handle("listUserPreferences", ({ params }) =>
+      .handle("listUserPreferences", ({ params, query }) =>
         users
-          .listUserPreferences(params.id)
+          .listUserPreferences(params.id, query)
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("setUserPreference", ({ params, payload }) =>

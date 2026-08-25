@@ -11,8 +11,10 @@ export const ProvidersApiHandlers = HttpApiBuilder.group(
 
     return handlers
       // ---------- channel_providers ----------
-      .handle("listChannelProviders", () =>
-        providers.listChannelProviders().pipe(Effect.map((data) => ok(data))),
+      .handle("listChannelProviders", ({ query }) =>
+        providers
+          .listChannelProviders(query)
+          .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addChannelProvider", ({ payload }) =>
         providers
@@ -33,9 +35,9 @@ export const ProvidersApiHandlers = HttpApiBuilder.group(
         providers.deleteChannelProvider(params.id),
       )
       // ---------- provider_usage_log ----------
-      .handle("listProviderUsageLogByDelivery", ({ params }) =>
+      .handle("listProviderUsageLogByDelivery", ({ params, query }) =>
         providers
-          .listProviderUsageLogByDelivery(params.deliveryId)
+          .listProviderUsageLogByDelivery(params.deliveryId, query)
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addProviderUsageLog", ({ payload }) =>

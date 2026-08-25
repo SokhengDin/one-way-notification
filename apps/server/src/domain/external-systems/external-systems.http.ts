@@ -11,9 +11,9 @@ export const ExternalSystemsApiHandlers = HttpApiBuilder.group(
 
     return handlers
       // ---------- external_systems ----------
-      .handle("listExternalSystems", () =>
+      .handle("listExternalSystems", ({ query }) =>
         externalSystems
-          .listExternalSystems()
+          .listExternalSystems(query)
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addExternalSystem", ({ payload }) =>
@@ -35,9 +35,9 @@ export const ExternalSystemsApiHandlers = HttpApiBuilder.group(
         externalSystems.deleteExternalSystem(params.id),
       )
       // ---------- external_user_links ----------
-      .handle("listExternalUserLinksByUser", ({ params }) =>
+      .handle("listExternalUserLinksByUser", ({ params, query }) =>
         externalSystems
-          .listExternalUserLinksByUser(params.userId)
+          .listExternalUserLinksByUser(params.userId, query)
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addExternalUserLink", ({ params, payload }) =>

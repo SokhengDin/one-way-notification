@@ -12,12 +12,14 @@ import {
   UserNotFound,
   UserRepoError,
 } from "../users/users.errors";
+import { PaginatedData, PaginationQuery } from "../shared/pagination";
 import { ApiResponse } from "./response";
 
 export class UsersApiGroup extends HttpApiGroup.make("users")
   .add(
     HttpApiEndpoint.get("listUsers", "/", {
-      success: ApiResponse(Schema.Array(UserRecord)),
+      query: PaginationQuery,
+      success: ApiResponse(PaginatedData(UserRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.post("addUser", "/", {
@@ -36,7 +38,8 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
     }),
     HttpApiEndpoint.get("listUserContacts", "/:id/contacts", {
       params: { id: Schema.String },
-      success: ApiResponse(Schema.Array(UserContactRecord)),
+      query: PaginationQuery,
+      success: ApiResponse(PaginatedData(UserContactRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.post("addUserContact", "/:id/contacts", {
@@ -67,7 +70,8 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
     }),
     HttpApiEndpoint.get("listUserPreferences", "/:id/preferences", {
       params: { id: Schema.String },
-      success: ApiResponse(Schema.Array(UserPreferenceRecord)),
+      query: PaginationQuery,
+      success: ApiResponse(PaginatedData(UserPreferenceRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.put("setUserPreference", "/:id/preferences", {

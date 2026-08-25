@@ -1,10 +1,11 @@
 import {
   makeMapSqlError,
+  normalizePagination,
   UserContactConflict,
+  UserContactRecord,
+  UserPreferenceRecord,
+  UserRecord,
   UserRepoError,
-  type UserContactRecord,
-  type UserPreferenceRecord,
-  type UserRecord,
   type UserRepoOperation,
 } from "@repo/schema";
 import { Effect } from "effect";
@@ -25,7 +26,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       RETURNING id, created_at, updated_at, deleted_at
     `.pipe(mapSqlError("addUser"));
 
-    return rows[0]!;
+    return new UserRecord(rows[0]!);
   });
 
   const findUserById: UserRepoService["findUserById"] = Effect.fn(
@@ -37,18 +38,30 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       WHERE id = ${id} AND deleted_at IS NULL
     `.pipe(mapSqlError("getUserById"));
 
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row ? new UserRecord(row) : null;
   });
 
   const listUsers: UserRepoService["listUsers"] = Effect.fn(
     "UsersRepo.listUsers",
-  )(function* () {
-    return yield* sql<UserRecord>`
-      SELECT id, created_at, updated_at, deleted_at
+  )(function* (input) {
+    const { skip, limit } = normalizePagination(input);
+
+    const rows = yield* sql<UserRecord & { readonly total_count: number }>`
+      SELECT id, created_at, updated_at, deleted_at,
+             COUNT(*) OVER()::int AS total_count
       FROM users
       WHERE deleted_at IS NULL
       ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${skip}
     `.pipe(mapSqlError("listUsers"));
+
+    return {
+      items: rows.map((row) => new UserRecord(row)),
+      total: rows[0]?.total_count ?? 0,
+      skip,
+      limit,
+    };
   });
 
   const deleteUser: UserRepoService["deleteUser"] = Effect.fn(
@@ -66,13 +79,26 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
 
   const listUserContacts: UserRepoService["listUserContacts"] = Effect.fn(
     "UsersRepo.listUserContacts",
-  )(function* (userId) {
-    return yield* sql<UserContactRecord>`
-      SELECT id, user_id, channel, address, linked, verified, created_at, updated_at, deleted_at
+  )(function* (userId, input) {
+    const { skip, limit } = normalizePagination(input);
+
+    const rows = yield* sql<
+      UserContactRecord & { readonly total_count: number }
+    >`
+      SELECT id, user_id, channel, address, linked, verified, created_at, updated_at, deleted_at,
+             COUNT(*) OVER()::int AS total_count
       FROM user_contacts
       WHERE user_id = ${userId} AND deleted_at IS NULL
       ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${skip}
     `.pipe(mapSqlError("listUserContacts"));
+
+    return {
+      items: rows.map((row) => new UserContactRecord(row)),
+      total: rows[0]?.total_count ?? 0,
+      skip,
+      limit,
+    };
   });
 
   const findUserContact: UserRepoService["findUserContact"] = Effect.fn(
@@ -84,7 +110,8 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       WHERE user_id = ${userId} AND channel = ${channel} AND deleted_at IS NULL
     `.pipe(mapSqlError("getUserContact"));
 
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row ? new UserContactRecord(row) : null;
   });
 
   const addUserContact: UserRepoService["addUserContact"] = Effect.fn(
@@ -107,7 +134,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       ),
     );
 
-    return rows[0]!;
+    return new UserContactRecord(rows[0]!);
   });
 
   const updateUserContact: UserRepoService["updateUserContact"] = Effect.fn(
@@ -124,16 +151,30 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       RETURNING id, user_id, channel, address, linked, verified, created_at, updated_at, deleted_at
     `.pipe(mapSqlError("updateUserContact"));
 
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row ? new UserContactRecord(row) : null;
   });
 
   const listUserPreferences: UserRepoService["listUserPreferences"] =
-    Effect.fn("UsersRepo.listUserPreferences")(function* (userId) {
-      return yield* sql<UserPreferenceRecord>`
-        SELECT user_id, channel, enabled
+    Effect.fn("UsersRepo.listUserPreferences")(function* (userId, input) {
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        UserPreferenceRecord & { readonly total_count: number }
+      >`
+        SELECT user_id, channel, enabled,
+               COUNT(*) OVER()::int AS total_count
         FROM user_preferences
         WHERE user_id = ${userId}
+        LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listUserPreferences"));
+
+      return {
+        items: rows.map((row) => new UserPreferenceRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
     });
 
   const setUserPreference: UserRepoService["setUserPreference"] = Effect.fn(
@@ -146,7 +187,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       RETURNING user_id, channel, enabled
     `.pipe(mapSqlError("setUserPreference"));
 
-    return rows[0]!;
+    return new UserPreferenceRecord(rows[0]!);
   });
 
   return {

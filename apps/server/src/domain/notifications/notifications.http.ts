@@ -11,9 +11,9 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
 
     return handlers
       // ---------- notification_templates ----------
-      .handle("listNotificationTemplates", () =>
+      .handle("listNotificationTemplates", ({ query }) =>
         notifications
-          .listNotificationTemplates()
+          .listNotificationTemplates(query)
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addNotificationTemplate", ({ payload }) =>
@@ -35,8 +35,10 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
         notifications.deleteNotificationTemplate(params.id),
       )
       // ---------- notifications ----------
-      .handle("listNotifications", () =>
-        notifications.listNotifications().pipe(Effect.map((data) => ok(data))),
+      .handle("listNotifications", ({ query }) =>
+        notifications
+          .listNotifications(query)
+          .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addNotification", ({ payload }) =>
         notifications
@@ -49,9 +51,9 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
           .pipe(Effect.map((data) => ok(data))),
       )
       // ---------- notification_deliveries ----------
-      .handle("listNotificationDeliveries", ({ params }) =>
+      .handle("listNotificationDeliveries", ({ params, query }) =>
         notifications
-          .listNotificationDeliveries(params.notificationId)
+          .listNotificationDeliveries(params.notificationId, query)
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("updateNotificationDeliveryStatus", ({ params, payload }) =>

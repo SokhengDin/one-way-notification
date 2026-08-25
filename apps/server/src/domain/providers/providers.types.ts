@@ -4,6 +4,8 @@ import type {
   ChannelProviderNotFound,
   ChannelProviderRecord,
   ChannelType,
+  PaginatedResult,
+  PaginationInput,
   ProviderRepoError,
   ProviderUsageLogRecord,
 } from "@repo/schema";
@@ -50,8 +52,10 @@ export interface ProviderRepoService {
     id: string,
   ) => Effect.Effect<ChannelProviderRecord | null, ProviderRepoError>;
 
-  readonly listChannelProviders: () => Effect.Effect<
-    ReadonlyArray<ChannelProviderRecord>,
+  readonly listChannelProviders: (
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<ChannelProviderRecord>,
     ProviderRepoError
   >;
 
@@ -74,8 +78,9 @@ export interface ProviderRepoService {
 
   readonly listProviderUsageLogByDelivery: (
     deliveryId: string,
+    input: PaginationInput,
   ) => Effect.Effect<
-    ReadonlyArray<ProviderUsageLogRecord>,
+    PaginatedResult<ProviderUsageLogRecord>,
     ProviderRepoError
   >;
 }
@@ -100,8 +105,10 @@ export interface ProvidersService {
     ProviderRepoError | ChannelProviderNotFound
   >;
 
-  readonly listChannelProviders: () => Effect.Effect<
-    ReadonlyArray<ChannelProviderRecord>,
+  readonly listChannelProviders: (
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<ChannelProviderRecord>,
     ProviderRepoError
   >;
 
@@ -124,8 +131,9 @@ export interface ProvidersService {
 
   readonly listProviderUsageLogByDelivery: (
     deliveryId: string,
+    input: PaginationInput,
   ) => Effect.Effect<
-    ReadonlyArray<ProviderUsageLogRecord>,
+    PaginatedResult<ProviderUsageLogRecord>,
     ProviderRepoError
   >;
 }

@@ -14,13 +14,15 @@ import {
   NotificationTemplateConflict,
   NotificationTemplateNotFound,
 } from "../notifications/notifications.errors";
+import { PaginatedData, PaginationQuery } from "../shared/pagination";
 import { ApiResponse } from "./response";
 
 export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
   .add(
     // ---------- notification_templates ----------
     HttpApiEndpoint.get("listNotificationTemplates", "/notification-template", {
-      success: ApiResponse(Schema.Array(NotificationTemplateRecord)),
+      query: PaginationQuery,
+      success: ApiResponse(PaginatedData(NotificationTemplateRecord)),
       error: NotificationRepoError,
     }),
     HttpApiEndpoint.post("addNotificationTemplate", "/notification-template", {
@@ -56,7 +58,8 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
 
     // ---------- notifications ----------
     HttpApiEndpoint.get("listNotifications", "/notification", {
-      success: ApiResponse(Schema.Array(NotificationRecord)),
+      query: PaginationQuery,
+      success: ApiResponse(PaginatedData(NotificationRecord)),
       error: NotificationRepoError,
     }),
     HttpApiEndpoint.post("addNotification", "/notification", {
@@ -82,7 +85,8 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
       "/notification/:notificationId/delivery",
       {
         params: { notificationId: Schema.String },
-        success: ApiResponse(Schema.Array(NotificationDeliveryRecord)),
+        query: PaginationQuery,
+        success: ApiResponse(PaginatedData(NotificationDeliveryRecord)),
         error: NotificationRepoError,
       },
     ),

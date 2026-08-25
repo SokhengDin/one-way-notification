@@ -11,9 +11,9 @@ export class ChannelProviderRecord extends Schema.Class<ChannelProviderRecord>(
     Schema.optionalKey,
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
-  created_at: Schema.String,
-  updated_at: Schema.NullOr(Schema.String),
-  deleted_at: Schema.NullOr(Schema.String),
+  created_at: Schema.Date,
+  updated_at: Schema.NullOr(Schema.Date),
+  deleted_at: Schema.NullOr(Schema.Date),
 }) {}
 
 export class ProviderUsageLogRecord extends Schema.Class<ProviderUsageLogRecord>(

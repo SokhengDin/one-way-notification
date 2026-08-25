@@ -10,13 +10,15 @@ import {
   ChannelProviderNotFound,
   ProviderRepoError,
 } from "../providers/providers.errors";
+import { PaginatedData, PaginationQuery } from "../shared/pagination";
 import { ApiResponse } from "./response";
 
 export class ProvidersApiGroup extends HttpApiGroup.make("providers")
   .add(
     // ---------- channel_providers ----------
     HttpApiEndpoint.get("listChannelProviders", "/channel-provider", {
-      success: ApiResponse(Schema.Array(ChannelProviderRecord)),
+      query: PaginationQuery,
+      success: ApiResponse(PaginatedData(ChannelProviderRecord)),
       error: ProviderRepoError,
     }),
     HttpApiEndpoint.post("addChannelProvider", "/channel-provider", {
@@ -62,7 +64,8 @@ export class ProvidersApiGroup extends HttpApiGroup.make("providers")
       "/channel-provider/delivery/:deliveryId/usage-log",
       {
         params: { deliveryId: Schema.String },
-        success: ApiResponse(Schema.Array(ProviderUsageLogRecord)),
+        query: PaginationQuery,
+        success: ApiResponse(PaginatedData(ProviderUsageLogRecord)),
         error: ProviderRepoError,
       },
     ),

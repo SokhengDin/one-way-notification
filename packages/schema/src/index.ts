@@ -1,5 +1,6 @@
 export * from "./enums";
 export * from "./shared/repo-error";
+export * from "./shared/pagination";
 export * from "./users/users";
 export * from "./users/users.errors";
 export * from "./api/users";

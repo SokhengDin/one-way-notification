@@ -46,8 +46,8 @@ export class Providers extends Context.Service<
         });
 
       const listChannelProviders: ProvidersService["listChannelProviders"] =
-        Effect.fn("Providers.listChannelProviders")(function* () {
-          return yield* repo.listChannelProviders();
+        Effect.fn("Providers.listChannelProviders")(function* (input) {
+          return yield* repo.listChannelProviders(input);
         });
 
       const updateChannelProvider: ProvidersService["updateChannelProvider"] =
@@ -77,8 +77,12 @@ export class Providers extends Context.Service<
       const listProviderUsageLogByDelivery: ProvidersService["listProviderUsageLogByDelivery"] =
         Effect.fn("Providers.listProviderUsageLogByDelivery")(function* (
           deliveryId,
+          input,
         ) {
-          return yield* repo.listProviderUsageLogByDelivery(deliveryId);
+          return yield* repo.listProviderUsageLogByDelivery(
+            deliveryId,
+            input,
+          );
         });
 
       return {

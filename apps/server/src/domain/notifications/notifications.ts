@@ -54,8 +54,10 @@ export class Notifications extends Context.Service<
         });
 
       const listNotificationTemplates: NotificationsService["listNotificationTemplates"] =
-        Effect.fn("Notifications.listNotificationTemplates")(function* () {
-          return yield* repo.listNotificationTemplates();
+        Effect.fn("Notifications.listNotificationTemplates")(function* (
+          input,
+        ) {
+          return yield* repo.listNotificationTemplates(input);
         });
 
       const updateNotificationTemplate: NotificationsService["updateNotificationTemplate"] =
@@ -97,8 +99,8 @@ export class Notifications extends Context.Service<
         });
 
       const listNotifications: NotificationsService["listNotifications"] =
-        Effect.fn("Notifications.listNotifications")(function* () {
-          return yield* repo.listNotifications();
+        Effect.fn("Notifications.listNotifications")(function* (input) {
+          return yield* repo.listNotifications(input);
         });
 
       // ---------- notification_deliveries ----------
@@ -106,8 +108,12 @@ export class Notifications extends Context.Service<
       const listNotificationDeliveries: NotificationsService["listNotificationDeliveries"] =
         Effect.fn("Notifications.listNotificationDeliveries")(function* (
           notificationId,
+          input,
         ) {
-          return yield* repo.listNotificationDeliveries(notificationId);
+          return yield* repo.listNotificationDeliveries(
+            notificationId,
+            input,
+          );
         });
 
       const updateNotificationDeliveryStatus: NotificationsService["updateNotificationDeliveryStatus"] =
