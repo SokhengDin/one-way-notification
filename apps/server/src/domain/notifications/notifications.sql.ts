@@ -108,21 +108,29 @@ export function makeSqlNotificationRepo(
       const rows = yield* sql<NotificationRecord>`
         INSERT INTO notifications (external_system_id, user_id, event_type, payload, idempotency_key)
         VALUES (${input.external_system_id}, ${input.user_id}, ${input.event_type}, ${input.payload}, ${input.idempotency_key ?? null})
+        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
         RETURNING id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
-      `.pipe(
-        Effect.catchReason(
-          "SqlError",
-          "UniqueViolation",
-          () =>
-            new NotificationConflict({
-              message: `A notification with idempotency key "${input.idempotency_key}" already exists`,
-            }),
-          (_reasons, error) =>
-            Effect.fail(toNotificationRepoError("addNotification", error)),
-        ),
-      );
+      `.pipe(mapSqlError("addNotification"));
 
-      return rows[0]!;
+      if (rows[0]) {
+        return rows[0];
+      }
+
+      const existing = yield* sql<NotificationRecord>`
+        SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
+        FROM notifications
+        WHERE idempotency_key = ${input.idempotency_key ?? null}
+      `.pipe(mapSqlError("addNotification"));
+
+      if (!existing[0]) {
+        return yield* Effect.fail(
+          new NotificationConflict({
+            message: `A notification with idempotency key "${input.idempotency_key}" could not be created or found`,
+          }),
+        );
+      }
+
+      return existing[0];
     });
 
   const findNotificationById: NotificationRepoService["findNotificationById"] =

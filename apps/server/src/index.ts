@@ -7,6 +7,8 @@ import { AppConfigLive, AppConfigService } from "./config/config";
 import { PgLive } from "./pg";
 import { UsersApiHandlers } from "./domain/users/users.http";
 import { NotificationsApiHandlers } from "./domain/notifications/notifications.http";
+import { ExternalSystemsApiHandlers } from "./domain/external-systems/external-systems.http";
+import { ProvidersApiHandlers } from "./domain/providers/providers.http";
 import { SystemApiHandlers } from "./domain/system/system.http";
 
 const LoggerLive = Logger.layer([
@@ -18,7 +20,13 @@ const LoggerLive = Logger.layer([
 ]);
 
 const ApiLive = HttpApiBuilder.layer(Api).pipe(
-  Layer.provide([UsersApiHandlers, NotificationsApiHandlers, SystemApiHandlers]),
+  Layer.provide([
+    UsersApiHandlers,
+    NotificationsApiHandlers,
+    ExternalSystemsApiHandlers,
+    ProvidersApiHandlers,
+    SystemApiHandlers,
+  ]),
   Layer.provide(PgLive),
 );
 

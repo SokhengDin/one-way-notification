@@ -1,5 +1,7 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
+import { ExternalSystemsApiGroup } from "./external-systems";
 import { NotificationsApiGroup } from "./notifications";
+import { ProvidersApiGroup } from "./providers";
 import { UsersApiGroup } from "./users";
 
 export class SystemApiGroup extends HttpApiGroup.make("system", {
@@ -13,5 +15,7 @@ export class SystemApiGroup extends HttpApiGroup.make("system", {
 export class Api extends HttpApi.make("one-way-notification-api")
   .add(UsersApiGroup)
   .add(NotificationsApiGroup)
+  .add(ExternalSystemsApiGroup)
+  .add(ProvidersApiGroup)
   .add(SystemApiGroup)
 {}
