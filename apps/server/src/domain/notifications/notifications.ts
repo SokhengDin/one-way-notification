@@ -36,7 +36,11 @@ export class Notifications extends Context.Service<
       // ---------- notification_templates ----------
 
       const addNotificationTemplate: NotificationsService["addNotificationTemplate"] =
-        (input) => repo.addNotificationTemplate(input);
+        Effect.fn("Notifications.addNotificationTemplate")(function* (
+          input,
+        ) {
+          return yield* repo.addNotificationTemplate(input);
+        });
 
       const getNotificationTemplateById: NotificationsService["getNotificationTemplateById"] =
         Effect.fn("Notifications.getNotificationTemplateById")(function* (
@@ -50,7 +54,9 @@ export class Notifications extends Context.Service<
         });
 
       const listNotificationTemplates: NotificationsService["listNotificationTemplates"] =
-        () => repo.listNotificationTemplates();
+        Effect.fn("Notifications.listNotificationTemplates")(function* () {
+          return yield* repo.listNotificationTemplates();
+        });
 
       const updateNotificationTemplate: NotificationsService["updateNotificationTemplate"] =
         Effect.fn("Notifications.updateNotificationTemplate")(function* (
@@ -76,9 +82,10 @@ export class Notifications extends Context.Service<
 
       // ---------- notifications ----------
 
-      const addNotification: NotificationsService["addNotification"] = (
-        input,
-      ) => repo.addNotification(input);
+      const addNotification: NotificationsService["addNotification"] =
+        Effect.fn("Notifications.addNotification")(function* (input) {
+          return yield* repo.addNotification(input);
+        });
 
       const getNotificationById: NotificationsService["getNotificationById"] =
         Effect.fn("Notifications.getNotificationById")(function* (id) {
@@ -90,12 +97,18 @@ export class Notifications extends Context.Service<
         });
 
       const listNotifications: NotificationsService["listNotifications"] =
-        () => repo.listNotifications();
+        Effect.fn("Notifications.listNotifications")(function* () {
+          return yield* repo.listNotifications();
+        });
 
       // ---------- notification_deliveries ----------
 
       const listNotificationDeliveries: NotificationsService["listNotificationDeliveries"] =
-        (notificationId) => repo.listNotificationDeliveries(notificationId);
+        Effect.fn("Notifications.listNotificationDeliveries")(function* (
+          notificationId,
+        ) {
+          return yield* repo.listNotificationDeliveries(notificationId);
+        });
 
       const updateNotificationDeliveryStatus: NotificationsService["updateNotificationDeliveryStatus"] =
         Effect.fn("Notifications.updateNotificationDeliveryStatus")(

@@ -28,8 +28,11 @@ export class Users extends Context.Service<Users, UsersService>()(
     Effect.gen(function* () {
       const repo = yield* UsersRepo;
 
-      const addUser: UsersService["addUser"] = (input) =>
-        repo.addUser(input);
+      const addUser: UsersService["addUser"] = Effect.fn("Users.addUser")(
+        function* (input) {
+          return yield* repo.addUser(input);
+        },
+      );
 
       const getUserById: UsersService["getUserById"] = Effect.fn(
         "Users.getUserById",
@@ -41,7 +44,11 @@ export class Users extends Context.Service<Users, UsersService>()(
         return user;
       });
 
-      const listUsers: UsersService["listUsers"] = () => repo.listUsers();
+      const listUsers: UsersService["listUsers"] = Effect.fn(
+        "Users.listUsers",
+      )(function* () {
+        return yield* repo.listUsers();
+      });
 
       const deleteUser: UsersService["deleteUser"] = Effect.fn(
         "Users.deleteUser",
@@ -52,8 +59,11 @@ export class Users extends Context.Service<Users, UsersService>()(
         }
       });
 
-      const listUserContacts: UsersService["listUserContacts"] = (userId) =>
-        repo.listUserContacts(userId);
+      const listUserContacts: UsersService["listUserContacts"] = Effect.fn(
+        "Users.listUserContacts",
+      )(function* (userId) {
+        return yield* repo.listUserContacts(userId);
+      });
 
       const getUserContact: UsersService["getUserContact"] = Effect.fn(
         "Users.getUserContact",
@@ -65,8 +75,11 @@ export class Users extends Context.Service<Users, UsersService>()(
         return contact;
       });
 
-      const addUserContact: UsersService["addUserContact"] = (input) =>
-        repo.addUserContact(input);
+      const addUserContact: UsersService["addUserContact"] = Effect.fn(
+        "Users.addUserContact",
+      )(function* (input) {
+        return yield* repo.addUserContact(input);
+      });
 
       const updateUserContact: UsersService["updateUserContact"] = Effect.fn(
         "Users.updateUserContact",
@@ -82,12 +95,16 @@ export class Users extends Context.Service<Users, UsersService>()(
         return contact;
       });
 
-      const listUserPreferences: UsersService["listUserPreferences"] = (
-        userId,
-      ) => repo.listUserPreferences(userId);
+      const listUserPreferences: UsersService["listUserPreferences"] =
+        Effect.fn("Users.listUserPreferences")(function* (userId) {
+          return yield* repo.listUserPreferences(userId);
+        });
 
-      const setUserPreference: UsersService["setUserPreference"] = (input) =>
-        repo.setUserPreference(input);
+      const setUserPreference: UsersService["setUserPreference"] = Effect.fn(
+        "Users.setUserPreference",
+      )(function* (input) {
+        return yield* repo.setUserPreference(input);
+      });
 
       return {
         addUser,
