@@ -66,6 +66,7 @@ export function makeSqlNotificationRepo(
       input,
     ) {
       const { skip, limit } = normalizePagination(input);
+      const externalSystemId = input.external_system_id ?? null;
 
       const rows = yield* sql<
         NotificationTemplateRecord & { readonly total_count: number }
@@ -74,6 +75,7 @@ export function makeSqlNotificationRepo(
                COUNT(*) OVER()::int AS total_count
         FROM notification_templates
         WHERE deleted_at IS NULL
+          AND (${externalSystemId}::uuid IS NULL OR external_system_id = ${externalSystemId})
         ORDER BY created_at DESC
         LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listNotificationTemplates"));

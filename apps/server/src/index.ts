@@ -2,7 +2,7 @@ import { Api } from "@repo/schema";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer, Logger } from "effect";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
-import { HttpRouter } from "effect/unstable/http";
+import { HttpMiddleware, HttpRouter } from "effect/unstable/http";
 import { AppConfigLive, AppConfigService } from "./config/config";
 import { PgLive } from "./pg";
 import { UsersApiHandlers } from "./domain/users/users.http";
@@ -41,7 +41,19 @@ const BunHttpServerLive = Layer.unwrap(
   }),
 ).pipe(Layer.provide(AppConfigLive));
 
-const HttpServerLive = HttpRouter.serve(AllRoutes).pipe(
+const ServedRoutesLive = Layer.unwrap(
+  Effect.gen(function* () {
+    const config = yield* AppConfigService;
+    return HttpRouter.serve(AllRoutes, {
+      middleware: HttpMiddleware.cors({
+        allowedOrigins: config.corsOrigins,
+        allowedMethods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
+      }),
+    });
+  }),
+).pipe(Layer.provide(AppConfigLive));
+
+const HttpServerLive = ServedRoutesLive.pipe(
   Layer.provide(BunHttpServerLive),
   Layer.provide(LoggerLive),
 );

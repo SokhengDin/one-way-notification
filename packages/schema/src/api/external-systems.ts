@@ -74,6 +74,16 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
         error: ExternalSystemRepoError,
       },
     ),
+    HttpApiEndpoint.get(
+      "listExternalUserLinksBySystem",
+      "/external-system/:externalSystemId/link",
+      {
+        params: { externalSystemId: Schema.String },
+        query: PaginationQuery,
+        success: ApiResponse(PaginatedData(ExternalUserLinkRecord)),
+        error: ExternalSystemRepoError,
+      },
+    ),
     HttpApiEndpoint.post(
       "addExternalUserLink",
       "/external-system/:externalSystemId/link",

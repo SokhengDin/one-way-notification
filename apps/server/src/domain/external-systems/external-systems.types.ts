@@ -83,6 +83,14 @@ export interface ExternalSystemRepoService {
     ExternalSystemRepoError
   >;
 
+  readonly listExternalUserLinksBySystem: (
+    externalSystemId: string,
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<ExternalUserLinkRecord>,
+    ExternalSystemRepoError
+  >;
+
   readonly deleteExternalUserLink: (
     id: string,
   ) => Effect.Effect<boolean, ExternalSystemRepoError>;
@@ -136,6 +144,14 @@ export interface ExternalSystemsService {
 
   readonly listExternalUserLinksByUser: (
     userId: string,
+    input: PaginationInput,
+  ) => Effect.Effect<
+    PaginatedResult<ExternalUserLinkRecord>,
+    ExternalSystemRepoError
+  >;
+
+  readonly listExternalUserLinksBySystem: (
+    externalSystemId: string,
     input: PaginationInput,
   ) => Effect.Effect<
     PaginatedResult<ExternalUserLinkRecord>,

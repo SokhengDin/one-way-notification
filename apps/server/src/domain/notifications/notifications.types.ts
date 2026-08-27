@@ -24,6 +24,10 @@ export interface AddNotificationTemplate {
   readonly subject: string | null;
 }
 
+export interface ListNotificationTemplatesInput extends PaginationInput {
+  readonly external_system_id?: string;
+}
+
 export interface UpdateNotificationTemplate {
   readonly template?: string;
   readonly subject?: string | null;
@@ -61,7 +65,7 @@ export interface NotificationRepoService {
   ) => Effect.Effect<NotificationTemplateRecord | null, NotificationRepoError>;
 
   readonly listNotificationTemplates: (
-    input: PaginationInput,
+    input: ListNotificationTemplatesInput,
   ) => Effect.Effect<
     PaginatedResult<NotificationTemplateRecord>,
     NotificationRepoError
@@ -131,7 +135,7 @@ export interface NotificationsService {
   >;
 
   readonly listNotificationTemplates: (
-    input: PaginationInput,
+    input: ListNotificationTemplatesInput,
   ) => Effect.Effect<
     PaginatedResult<NotificationTemplateRecord>,
     NotificationRepoError

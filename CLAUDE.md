@@ -11,7 +11,14 @@ Bun workspaces, not Turborepo/Nx.
 
 - `apps/server` — the API, built on Effect. Owns the Postgres schema
   (`apps/server/db/migrations/`).
-- `apps/web` — Next.js app. Not yet wired to the API.
+- `apps/web` — Next.js app, the admin dashboard for the API. Client
+  Components fetch via TanStack Query wrapping a thin `HttpApiClient`
+  (`lib/api-client.ts`, `lib/api/*.ts`). UI is built on shadcn/ui
+  (`components/ui/*`, Tailwind v4 + Base UI primitives under
+  `components.json`'s `base-nova` preset) — not hand-rolled Tailwind-only
+  components. Domain-specific wrapper components (`components/*.tsx` outside
+  `ui/`) compose shadcn primitives into the app's own API (e.g. `Card`,
+  `DataTable`, `SelectField`).
 - `packages/schema` (`@repo/schema`) — the single source of truth for
   domain records, domain errors, and the `HttpApi` contract (endpoints,
   groups). Shared between server and, eventually, web. API definitions live
@@ -119,11 +126,17 @@ the one intentional exception — pure append-only log).
 `bun run migrate` (from repo root) runs `apps/server/db/migrate.ts` against
 `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASS` — loaded from
 `apps/server/.env` (copy `apps/server/.env.example`). Same vars, plus
-`APP_PORT`, are read by the server itself via `apps/server/src/config/config.ts`.
+`APP_PORT` and `CORS_ORIGINS` (comma-separated allowed origins for the
+dashboard, defaults to `http://localhost:3000`), are read by the server
+itself via `apps/server/src/config/config.ts`. CORS is applied via
+`HttpMiddleware.cors` passed as the `middleware` option to
+`HttpRouter.serve` in `apps/server/src/index.ts` — not a separate layer.
 
 ## Current domain status
 
 - `users` — complete: repo/service/handler layers, full CRUD +
   contacts/preferences, Swagger-documented.
 - `notifications` — schema/types only, no service or HTTP layer yet.
-- `apps/web` — untouched scaffold, not connected to the API.
+- `apps/web` — admin dashboard covering all 5 domains (users, notifications,
+  external-systems, providers, system overview), wired to the API via
+  `@repo/schema`'s `HttpApiClient`. No auth in v1.

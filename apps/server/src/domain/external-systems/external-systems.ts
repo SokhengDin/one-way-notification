@@ -88,6 +88,17 @@ export class ExternalSystems extends Context.Service<
           return yield* repo.listExternalUserLinksByUser(userId, input);
         });
 
+      const listExternalUserLinksBySystem: ExternalSystemsService["listExternalUserLinksBySystem"] =
+        Effect.fn("ExternalSystems.listExternalUserLinksBySystem")(function* (
+          externalSystemId,
+          input,
+        ) {
+          return yield* repo.listExternalUserLinksBySystem(
+            externalSystemId,
+            input,
+          );
+        });
+
       const deleteExternalUserLink: ExternalSystemsService["deleteExternalUserLink"] =
         Effect.fn("ExternalSystems.deleteExternalUserLink")(function* (id) {
           const deleted = yield* repo.deleteExternalUserLink(id);
@@ -104,6 +115,7 @@ export class ExternalSystems extends Context.Service<
         deleteExternalSystem,
         addExternalUserLink,
         listExternalUserLinksByUser,
+        listExternalUserLinksBySystem,
         deleteExternalUserLink,
       };
     }),

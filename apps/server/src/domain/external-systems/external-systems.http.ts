@@ -48,6 +48,11 @@ export const ExternalSystemsApiHandlers = HttpApiBuilder.group(
           })
           .pipe(Effect.map((data) => ok(data, 201, "Created"))),
       )
+      .handle("listExternalUserLinksBySystem", ({ params, query }) =>
+        externalSystems
+          .listExternalUserLinksBySystem(params.externalSystemId, query)
+          .pipe(Effect.map((data) => ok(data))),
+      )
       .handle("deleteExternalUserLink", ({ params }) =>
         externalSystems.deleteExternalUserLink(params.id),
       );

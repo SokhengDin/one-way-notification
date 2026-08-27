@@ -21,7 +21,10 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
   .add(
     // ---------- notification_templates ----------
     HttpApiEndpoint.get("listNotificationTemplates", "/notification-template", {
-      query: PaginationQuery,
+      query: {
+        ...PaginationQuery,
+        external_system_id: Schema.optional(Schema.String),
+      },
       success: ApiResponse(PaginatedData(NotificationTemplateRecord)),
       error: NotificationRepoError,
     }),

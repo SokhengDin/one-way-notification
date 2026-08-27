@@ -10,6 +10,7 @@ export const ExternalSystemRepoOperation = Schema.Literals([
   // external_user_links
   "addExternalUserLink",
   "listExternalUserLinksByUser",
+  "listExternalUserLinksBySystem",
   "deleteExternalUserLink",
 ]);
 

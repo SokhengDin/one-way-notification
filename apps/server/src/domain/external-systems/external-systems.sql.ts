@@ -176,6 +176,32 @@ export function makeSqlExternalSystemsRepo(
       };
     });
 
+  const listExternalUserLinksBySystem: ExternalSystemRepoService["listExternalUserLinksBySystem"] =
+    Effect.fn("ExternalSystemsRepo.listExternalUserLinksBySystem")(function* (
+      externalSystemId,
+      input,
+    ) {
+      const { skip, limit } = normalizePagination(input);
+
+      const rows = yield* sql<
+        ExternalUserLinkRecord & { readonly total_count: number }
+      >`
+        SELECT id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at,
+               COUNT(*) OVER()::int AS total_count
+        FROM external_user_links
+        WHERE external_system_id = ${externalSystemId} AND deleted_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
+      `.pipe(mapSqlError("listExternalUserLinksBySystem"));
+
+      return {
+        items: rows.map((row) => new ExternalUserLinkRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
+    });
+
   const deleteExternalUserLink: ExternalSystemRepoService["deleteExternalUserLink"] =
     Effect.fn("ExternalSystemsRepo.deleteExternalUserLink")(function* (id) {
       const rows = yield* sql<{ id: string }>`
@@ -196,6 +222,7 @@ export function makeSqlExternalSystemsRepo(
     deleteExternalSystem,
     addExternalUserLink,
     listExternalUserLinksByUser,
+    listExternalUserLinksBySystem,
     deleteExternalUserLink,
   };
 }
