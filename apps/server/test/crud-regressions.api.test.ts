@@ -127,7 +127,11 @@ describe("notifications", () => {
 
 describe("channel providers", () => {
   test("create, get, update, delete", async () => {
-    const created = await api("POST", "/api/channel-provider", { channel: "email", name: "ses" });
+    const created = await api("POST", "/api/channel-provider", {
+      channel: "email", name: "ses", kind: "amazon_ses",
+      config:  { region: "eu-west-3", access_key_id: "AKIA1", from_email: "a@acme.test" },
+      secrets: { secret_access_key: "s" },
+    });
     expect(created.status).toBe(200);
     const provider = created.json.data;
     expect(provider.is_active).toBe(true);

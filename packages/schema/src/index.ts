@@ -19,3 +19,7 @@ export * from "./shared/ids";
 export * from "./assets/assets";
 export * from "./assets/assets.errors";
 export * from "./api/assets";
+export * from "./providers/provider-kinds";
+export * from "./stats/stats";
+export * from "./stats/stats.errors";
+export * from "./api/stats";

@@ -25,6 +25,8 @@ const CHANNEL_ICONS: Record<ChannelType, React.ComponentType<{ className?: strin
   telegram: Send,
 };
 
+const CHANNEL_LABELS: Record<ChannelType, string> = { email: "Email", sms: "SMS", telegram: "Telegram" };
+
 const CHANNEL_CLASSES: Record<ChannelType, string> = {
   email: "bg-chart-1/15 text-chart-1",
   sms: "bg-chart-4/15 text-chart-4",
@@ -34,9 +36,9 @@ const CHANNEL_CLASSES: Record<ChannelType, string> = {
 export function ChannelBadge({ channel }: { channel: ChannelType }) {
   const Icon = CHANNEL_ICONS[channel];
   return (
-    <Badge variant="outline" className={cn("gap-1 border-transparent capitalize", CHANNEL_CLASSES[channel])}>
+    <Badge variant="outline" className={cn("gap-1 border-transparent", CHANNEL_CLASSES[channel])}>
       <Icon className="size-3" />
-      {channel}
+      {CHANNEL_LABELS[channel]}
     </Badge>
   );
 }

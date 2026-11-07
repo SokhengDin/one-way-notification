@@ -6,21 +6,77 @@ import type {
   ChannelType,
   PaginatedResult,
   PaginationInput,
+  ProviderConfigValue,
+  ProviderInvalid,
   ProviderRepoError,
+  ProviderSecretsUnavailable,
   ProviderUsageLogRecord,
 } from "@repo/schema";
 
 // ---------- channel_providers ----------
 
+export type ProviderConfig = Readonly<Record<string, ProviderConfigValue>>;
+
+/** API input for creating a provider. */
 export interface AddChannelProvider {
-  readonly channel: ChannelType;
-  readonly name: string;
+  readonly channel:    ChannelType;
+  readonly name:       string;
+  readonly kind:       string;
   readonly is_active?: boolean;
+  readonly priority?:  number;
+  readonly config:     ProviderConfig;
+  readonly secrets?:   Readonly<Record<string, string>>;
 }
 
+/** API input for updating a provider. */
 export interface UpdateChannelProvider {
-  readonly name?: string;
+  readonly name?:      string;
   readonly is_active?: boolean;
+  readonly priority?:  number;
+  readonly config?:    ProviderConfig;
+  /** per field: string sets, null clears, "" or omitted keeps */
+  readonly secrets?:   Readonly<Record<string, string | null>>;
+}
+
+export interface ListChannelProvidersInput extends PaginationInput {
+  readonly channel?: ChannelType;
+}
+
+/** What the repo writes — already validated and encrypted by the service. */
+export interface InsertChannelProvider {
+  readonly id:          string;
+  readonly channel:     ChannelType;
+  readonly name:        string;
+  readonly kind:        string;
+  readonly is_active:   boolean;
+  readonly priority:    number;
+  readonly config:      ProviderConfig;
+  readonly secrets:     Uint8Array | null;
+  readonly secret_keys: ReadonlyArray<string>;
+}
+
+export interface PatchChannelProvider {
+  readonly name?:      string;
+  readonly is_active?: boolean;
+  readonly priority?:  number;
+  readonly config?:    ProviderConfig;
+  /** present = replace the encrypted blob (null clears it) */
+  readonly secrets?:   { readonly blob: Uint8Array | null; readonly keys: ReadonlyArray<string> };
+}
+
+/** Internal row incl. the encrypted blob — never leaves the service. */
+export interface ProviderWithSecrets {
+  readonly record:  ChannelProviderRecord;
+  readonly secrets: Uint8Array | null;
+}
+
+/** Decrypted settings for whatever actually sends (the future delivery worker). */
+export interface ProviderCredentials {
+  readonly id:      string;
+  readonly channel: ChannelType;
+  readonly kind:    string;
+  readonly config:  ProviderConfig;
+  readonly secrets: Readonly<Record<string, string>>;
 }
 
 // ---------- provider_usage_log ----------
@@ -42,7 +98,7 @@ export interface AddProviderUsageLog {
 export interface ProviderRepoService {
   // channel_providers
   readonly addChannelProvider: (
-    input: AddChannelProvider,
+    input: InsertChannelProvider,
   ) => Effect.Effect<
     ChannelProviderRecord,
     ProviderRepoError | ChannelProviderConflict
@@ -52,8 +108,12 @@ export interface ProviderRepoService {
     id: string,
   ) => Effect.Effect<ChannelProviderRecord | null, ProviderRepoError>;
 
+  readonly findChannelProviderWithSecrets: (
+    id: string,
+  ) => Effect.Effect<ProviderWithSecrets | null, ProviderRepoError>;
+
   readonly listChannelProviders: (
-    input: PaginationInput,
+    input: ListChannelProvidersInput,
   ) => Effect.Effect<
     PaginatedResult<ChannelProviderRecord>,
     ProviderRepoError
@@ -61,7 +121,7 @@ export interface ProviderRepoService {
 
   readonly updateChannelProvider: (
     id: string,
-    input: UpdateChannelProvider,
+    input: PatchChannelProvider,
   ) => Effect.Effect<
     ChannelProviderRecord | null,
     ProviderRepoError | ChannelProviderConflict
@@ -86,8 +146,8 @@ export interface ProviderRepoService {
 }
 
 /**
- * Service layer: wraps the repo and turns its null results into the
- * flat domain errors declared on the API endpoints.
+ * Service layer: validates configuration against the provider catalog,
+ * encrypts credentials, and turns repo nulls into domain errors.
  */
 export interface ProvidersService {
   // channel_providers
@@ -95,7 +155,7 @@ export interface ProvidersService {
     input: AddChannelProvider,
   ) => Effect.Effect<
     ChannelProviderRecord,
-    ProviderRepoError | ChannelProviderConflict
+    ProviderRepoError | ChannelProviderConflict | ProviderInvalid | ProviderSecretsUnavailable
   >;
 
   readonly getChannelProviderById: (
@@ -106,7 +166,7 @@ export interface ProvidersService {
   >;
 
   readonly listChannelProviders: (
-    input: PaginationInput,
+    input: ListChannelProvidersInput,
   ) => Effect.Effect<
     PaginatedResult<ChannelProviderRecord>,
     ProviderRepoError
@@ -117,12 +177,24 @@ export interface ProvidersService {
     input: UpdateChannelProvider,
   ) => Effect.Effect<
     ChannelProviderRecord,
-    ProviderRepoError | ChannelProviderNotFound | ChannelProviderConflict
+    | ProviderRepoError
+    | ChannelProviderNotFound
+    | ChannelProviderConflict
+    | ProviderInvalid
+    | ProviderSecretsUnavailable
   >;
 
   readonly deleteChannelProvider: (
     id: string,
   ) => Effect.Effect<void, ProviderRepoError | ChannelProviderNotFound>;
+
+  /** Decrypted config + credentials. Not exposed over HTTP. */
+  readonly resolveProviderCredentials: (
+    id: string,
+  ) => Effect.Effect<
+    ProviderCredentials,
+    ProviderRepoError | ChannelProviderNotFound | ProviderInvalid | ProviderSecretsUnavailable
+  >;
 
   // provider_usage_log
   readonly addProviderUsageLog: (

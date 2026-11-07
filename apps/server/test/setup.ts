@@ -13,6 +13,8 @@ if (!/test/i.test(testDbName)) {
 
 process.env.DB_NAME    = testDbName;
 process.env.PUBLIC_URL = "https://notify.test";
+// fixed test key; never a real one
+process.env.PROVIDER_SECRET_KEY = "test-only-provider-secret-key";
 
 const connection = {
   hostname: process.env.DB_HOST ?? "localhost",

@@ -41,3 +41,23 @@ export class ChannelProviderConflict extends Schema.TaggedErrorClass<ChannelProv
   },
   { httpApiStatus: 409 },
 ) {}
+
+// Submitted configuration doesn't satisfy the provider kind's spec.
+export class ProviderInvalid extends Schema.TaggedErrorClass<ProviderInvalid>()(
+  "ProviderInvalid",
+  {
+    message: Schema.String,
+    issues:  Schema.optionalKey(Schema.Array(Schema.String)),
+  },
+  { httpApiStatus: 422 },
+) {}
+
+// Credentials can't be stored or read: PROVIDER_SECRET_KEY is missing, or
+// stored secrets were encrypted with a different key.
+export class ProviderSecretsUnavailable extends Schema.TaggedErrorClass<ProviderSecretsUnavailable>()(
+  "ProviderSecretsUnavailable",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 503 },
+) {}
