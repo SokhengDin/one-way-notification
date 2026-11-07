@@ -3,12 +3,33 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import type { ChannelProviderRecord } from "@repo/schema";
+import { providerKindSpec, type ChannelProviderRecord } from "@repo/schema";
+import { Badge } from "@/components/ui/badge";
 import { LinkButton } from "../../components/button";
 import { DataTable, type DataTableColumn } from "../../components/data-table";
 import { PageHeader } from "../../components/page-header";
 import { BooleanBadge, ChannelBadge } from "../../components/status-badge";
 import { listChannelProviders } from "../../lib/api/providers";
+
+function sender(provider: ChannelProviderRecord): string {
+  const { config } = provider;
+  const value = config.from_email ?? config.from_number ?? config.from ?? null;
+  if (value === null) return "—";
+  return config.from_name ? `${config.from_name} <${value}>` : String(value);
+}
+
+function CredentialsBadge({ provider }: { readonly provider: ChannelProviderRecord }) {
+  const spec = provider.kind ? providerKindSpec(provider.kind) : undefined;
+  if (!spec) return <Badge variant="outline">Not configured</Badge>;
+  const missing = spec.fields.filter((field) => field.secret && field.required && !provider.secret_keys.includes(field.key));
+  return missing.length === 0 ? (
+    <Badge variant="outline" className="border-transparent bg-success/15 text-success">Saved</Badge>
+  ) : (
+    <Badge variant="outline" className="border-transparent bg-destructive/10 text-destructive">
+      Missing {missing.map((field) => field.label.toLowerCase()).join(", ")}
+    </Badge>
+  );
+}
 
 const columns: ReadonlyArray<DataTableColumn<ChannelProviderRecord>> = [
   {
@@ -19,8 +40,12 @@ const columns: ReadonlyArray<DataTableColumn<ChannelProviderRecord>> = [
       </Link>
     ),
   },
-  { header: "Channel", cell: (row) => <ChannelBadge channel={row.channel} /> },
-  { header: "Active", cell: (row) => <BooleanBadge value={row.is_active ?? true} /> },
+  { header: "Channel",     cell: (row) => <ChannelBadge channel={row.channel} /> },
+  { header: "Service",     cell: (row) => (row.kind ? providerKindSpec(row.kind)?.label ?? row.kind : "—") },
+  { header: "Sends from",  cell: (row) => <span className="text-xs">{sender(row)}</span> },
+  { header: "Priority",    cell: (row) => <span className="tabular-nums">{row.priority}</span> },
+  { header: "Credentials", cell: (row) => <CredentialsBadge provider={row} /> },
+  { header: "Active",      cell: (row) => <BooleanBadge value={row.is_active ?? true} /> },
 ];
 
 export default function ProvidersPage() {
@@ -28,13 +53,14 @@ export default function ProvidersPage() {
 
   const query = useQuery({
     queryKey: ["channel-providers", pagination],
-    queryFn: () => listChannelProviders(pagination),
+    queryFn:  () => listChannelProviders(pagination),
   });
 
   return (
     <div>
       <PageHeader
         title="Providers"
+        description="Where notifications are sent through, per channel. Lower priority is tried first."
         actions={<LinkButton href="/providers/new">New provider</LinkButton>}
       />
       <DataTable
@@ -44,6 +70,7 @@ export default function ProvidersPage() {
         isLoading={query.isLoading}
         error={query.error}
         onPageChange={(skip, limit) => setPagination({ skip, limit })}
+        emptyMessage="No providers yet. Add one to start sending."
       />
     </div>
   );

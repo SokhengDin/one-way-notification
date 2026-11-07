@@ -7,7 +7,8 @@ import { CHANNEL_TYPES, type ChannelType } from "@repo/schema";
 import { Button } from "../../../../components/button";
 import { Card } from "../../../../components/card";
 import { Combobox } from "../../../../components/combobox";
-import { SelectField, TextAreaField, TextField } from "../../../../components/form-field";
+import { SelectField, TextField } from "../../../../components/form-field";
+import { TemplateEditor } from "../../../../components/template-editor";
 import { PageHeader } from "../../../../components/page-header";
 import { listExternalSystems } from "../../../../lib/api/external-systems";
 import { addNotificationTemplate, listNotificationTemplates } from "../../../../lib/api/notifications";
@@ -22,6 +23,8 @@ export default function NewNotificationTemplatePage() {
   const [channel, setChannel] = useState<ChannelType>("email");
   const [template, setTemplate] = useState("");
   const [subject, setSubject] = useState("");
+  const [previewIssues, setPreviewIssues] = useState<ReadonlyArray<string>>([]);
+  const [payloadVariables, setPayloadVariables] = useState<ReadonlyArray<string>>([]);
 
   const systemsQuery = useQuery({
     queryKey: ["external-systems", { name: systemSearch }],
@@ -122,17 +125,18 @@ export default function NewNotificationTemplatePage() {
             required={channel === "email"}
             hint={channel === "email" ? "Required for email. Variables work here too." : "Not used for this channel."}
           />
-          <TextAreaField
+          <TemplateEditor
             label="Template"
             value={template}
-            onChange={(event) => setTemplate(event.target.value)}
-            className="min-h-60 text-xs"
-            spellCheck={false}
-            hint='{{name}} inserts a value (HTML-escaped in email), {{{html}}} inserts raw HTML, {{name | default: "there"}} sets a fallback.'
-            required
+            onChange={setTemplate}
+            channel={channel}
+            externalSystemId={externalSystemId}
+            variables={payloadVariables}
+            issues={previewIssues}
+            placeholder={channel === "email" ? "<p>Hello {{name}}</p>" : "Your code is {{code}}"}
           />
           <div>
-            <Button type="submit" disabled={mutation.isPending || !externalSystemId}>
+            <Button type="submit" disabled={mutation.isPending || !externalSystemId || template.trim() === ""}>
               {mutation.isPending ? "Creating…" : "Create template"}
             </Button>
           </div>
@@ -143,6 +147,8 @@ export default function NewNotificationTemplatePage() {
         channel={channel}
         template={template}
         subject={subject || null}
+        onIssuesChange={setPreviewIssues}
+        onPayloadPathsChange={setPayloadVariables}
       />
       </div>
     </div>

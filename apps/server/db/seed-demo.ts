@@ -1,0 +1,171 @@
+// Fills a development database with ~45 days of realistic, deterministic
+// notification traffic so the dashboard has something to show:
+//
+//   bun run seed:demo            (from the repo root)
+//
+// Writes directly with SQL (deliveries have no create endpoint yet). Refuses
+// databases whose name doesn't look disposable, and refuses to run twice.
+
+import { SQL } from "bun";
+
+const dbName = process.env.DB_NAME ?? "";
+if (!/dev|test|demo|local/i.test(dbName)) {
+  console.error(`Refusing to seed "${dbName}": the database name must contain dev, test, demo or local.`);
+  process.exit(1);
+}
+
+const sql = new SQL({
+  hostname: process.env.DB_HOST ?? "localhost",
+  port:     Number(process.env.DB_PORT ?? 5432),
+  database: dbName,
+  username: process.env.DB_USER ?? "postgres",
+  password: process.env.DB_PASS ?? "postgres",
+});
+
+const [already] = await sql`SELECT 1 AS x FROM external_systems WHERE name = 'Demo Shop' LIMIT 1`;
+if (already) {
+  console.log(`"${dbName}" already has demo data — nothing to do.`);
+  await sql.close();
+  process.exit(0);
+}
+
+// ---------- deterministic randomness ----------
+
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const random = mulberry32(20261107);
+const pick   = <T>(items: ReadonlyArray<T>): T => items[Math.floor(random() * items.length)]!;
+const chance = (p: number) => random() < p;
+const between = (min: number, max: number) => min + Math.floor(random() * (max - min + 1));
+
+// ---------- fixtures ----------
+
+const SYSTEMS = [
+  { name: "Demo Shop",    weight: 0.55, events: ["order.confirmed", "order.delivered", "cart.reminder"] },
+  { name: "Demo Billing", weight: 0.25, events: ["invoice.paid", "invoice.overdue"] },
+  { name: "Demo Auth",    weight: 0.20, events: ["password.reset", "login.alert", "email.verify"] },
+] as const;
+
+const PROVIDERS = [
+  { name: "Demo Amazon SES", channel: "email",    kind: "amazon_ses",   priority: 10, config: { region: "eu-west-3", access_key_id: "AKIADEMO", from_email: "noreply@demo.test", from_name: "Demo" } },
+  { name: "Demo own SMTP",   channel: "email",    kind: "smtp",         priority: 20, config: { host: "smtp.demo.test", port: 587, security: "starttls", from_email: "noreply@demo.test" } },
+  { name: "Demo Twilio",     channel: "sms",      kind: "twilio",       priority: 10, config: { account_sid: "ACDEMO", from_number: "+33612345678" } },
+  { name: "Demo Telegram",   channel: "telegram", kind: "telegram_bot", priority: 10, config: { parse_mode: "HTML" } },
+] as const;
+
+const ERRORS: Record<string, ReadonlyArray<string>> = {
+  email:    ["550 5.1.1 Recipient address rejected: user unknown", "Mailbox full", "Throttling: Maximum sending rate exceeded", "421 Service not available, closing channel"],
+  sms:      ["21610: Attempt to send to unsubscribed recipient", "30003: Unreachable destination handset", "21211: Invalid 'To' phone number"],
+  telegram: ["403: Forbidden: bot was blocked by the user", "400: Bad Request: chat not found"],
+};
+
+const COST: Record<string, number> = { amazon_ses: 0.0001, smtp: 0, twilio: 0.0079, telegram_bot: 0 };
+
+// ---------- seed ----------
+
+const DAYS = 45;
+const now  = Date.now();
+const DAY  = 86_400_000;
+
+await sql.begin(async (tx) => {
+  const systems = await tx`
+    INSERT INTO external_systems ${tx(SYSTEMS.map((s) => ({ name: s.name, api_key: `demo-${s.name.toLowerCase().replace(/\W+/g, "-")}` })))}
+    RETURNING id, name
+  `;
+  const systemId = new Map(systems.map((row: { id: string; name: string }) => [row.name, row.id]));
+
+  const providers = await tx`
+    INSERT INTO channel_providers ${tx(PROVIDERS.map((p) => ({ name: p.name, channel: p.channel, kind: p.kind, priority: p.priority, config: p.config })))}
+    RETURNING id, name, channel, kind
+  `;
+  const providersFor = (channel: string) => providers.filter((p: { channel: string }) => p.channel === channel);
+
+  // users have no columns to fill, so there's no bulk VALUES form
+  const users: Array<{ id: string }> = [];
+  for (let i = 0; i < 40; i++) {
+    users.push(...(await tx`INSERT INTO users DEFAULT VALUES RETURNING id`));
+  }
+
+  const notifications: Array<Record<string, unknown>> = [];
+  const deliveries:    Array<Record<string, unknown>> = [];
+  const usage:         Array<Record<string, unknown>> = [];
+
+  for (let dayAgo = DAYS - 1; dayAgo >= 0; dayAgo--) {
+    const dayStart = now - dayAgo * DAY - (now % DAY);
+    const weekday  = new Date(dayStart).getUTCDay();
+    const volume   = between(18, 40) + (weekday === 1 || weekday === 2 ? 15 : 0) - (weekday === 0 || weekday === 6 ? 10 : 0);
+    // a bad afternoon a week ago: a burst of email failures
+    const incident = dayAgo === 7;
+
+    for (let i = 0; i < volume; i++) {
+      const created = new Date(Math.min(now - 60_000, dayStart + Math.floor(random() * DAY)));
+      const r       = random();
+      const system  = r < SYSTEMS[0].weight ? SYSTEMS[0] : r < SYSTEMS[0].weight + SYSTEMS[1].weight ? SYSTEMS[1] : SYSTEMS[2];
+      const notificationId = crypto.randomUUID();
+
+      notifications.push({
+        id:                 notificationId,
+        external_system_id: systemId.get(system.name),
+        user_id:            pick(users).id,
+        event_type:         pick(system.events),
+        payload:            { demo: true },
+        created_at:         created,
+      });
+
+      const channels = ["email", ...(chance(0.3) ? ["sms"] : []), ...(chance(0.12) ? ["telegram"] : [])];
+      for (const channel of channels) {
+        const candidates = providersFor(channel);
+        const provider   = channel === "email" && candidates.length > 1 && chance(0.3) ? candidates[1] : candidates[0];
+        const recent     = now - created.getTime() < 3 * 3_600_000;
+        const failP      = incident && channel === "email" ? 0.35 : channel === "sms" ? 0.07 : 0.04;
+
+        const status = recent && chance(0.4) ? pick(["pending", "retrying"]) : chance(failP) ? "failed" : chance(0.03) ? "skipped" : "sent";
+        const attempts = status === "pending" ? 0 : status === "failed" ? between(1, 3) : status === "skipped" ? 0 : chance(0.08) ? 2 : 1;
+        const updated  = new Date(created.getTime() + between(1, 90) * 1000);
+        const deliveryId = crypto.randomUUID();
+
+        deliveries.push({
+          id:              deliveryId,
+          notification_id: notificationId,
+          channel,
+          provider_id:     status === "skipped" ? null : provider.id,
+          status,
+          attempt_count:   attempts,
+          last_error:      status === "failed" ? pick(ERRORS[channel]!) : null,
+          sent_at:         status === "sent" ? updated : null,
+          created_at:      created,
+          updated_at:      status === "pending" ? null : updated,
+        });
+
+        for (let attempt = 0; attempt < attempts; attempt++) {
+          usage.push({
+            delivery_id:  deliveryId,
+            provider_id:  provider.id,
+            status_code:  status === "failed" ? pick([400, 403, 429, 500, 550]) : 202,
+            cost:         (COST[provider.kind] ?? 0).toFixed(4),
+            attempted_at: new Date(created.getTime() + attempt * 30_000),
+          });
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < notifications.length; i += 500) await tx`INSERT INTO notifications ${tx(notifications.slice(i, i + 500))}`;
+  for (let i = 0; i < deliveries.length; i += 500)    await tx`INSERT INTO notification_deliveries ${tx(deliveries.slice(i, i + 500))}`;
+  for (let i = 0; i < usage.length; i += 500)         await tx`INSERT INTO provider_usage_log ${tx(usage.slice(i, i + 500))}`;
+
+  console.log(
+    `Seeded "${dbName}": ${systems.length} systems, ${providers.length} providers, ${users.length} users, ` +
+    `${notifications.length} notifications, ${deliveries.length} deliveries, ${usage.length} provider attempts.`,
+  );
+});
+
+await sql.close();

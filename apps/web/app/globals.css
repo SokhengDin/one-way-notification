@@ -140,3 +140,32 @@
     @apply font-sans;
   }
 }
+/* Data-viz palette (dataviz skill reference palette, validated).
+   Status colours carry delivery state; categorical slots carry channel
+   identity. Solid fills only — no gradients. Dark values are selected
+   separately, not inverted. */
+:root {
+  --viz-sent:     #0ca30c;
+  --viz-failed:   #d03b3b;
+  --viz-progress: #898781;
+  --viz-skipped:  #c3c2b7;
+  --viz-email:    #2a78d6;
+  --viz-sms:      #eb6834;
+  --viz-telegram: #1baf7a;
+  --viz-bar:      #2a78d6;
+  --viz-grid:     #e1e0d9;
+  --viz-axis:     #c3c2b7;
+  --viz-muted:    #898781;
+  --viz-up-good:  #006300;
+}
+
+.dark {
+  --viz-skipped:  #52514e;
+  --viz-email:    #3987e5;
+  --viz-sms:      #d95926;
+  --viz-telegram: #199e70;
+  --viz-bar:      #3987e5;
+  --viz-grid:     #2c2c2a;
+  --viz-axis:     #383835;
+  --viz-up-good:  #0ca30c;
+}

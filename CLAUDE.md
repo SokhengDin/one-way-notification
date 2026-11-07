@@ -121,7 +121,9 @@ Migrations in `apps/server/db/migrations/`, applied in filename order:
 `001_create_tables.sql` (`external_systems`, `users`, `external_user_links`,
 `user_contacts`, `user_preferences`, `notification_templates`,
 `channel_providers`, `notifications`, `notification_deliveries`,
-`provider_usage_log`) and `002_create_brand_assets.sql` (`brand_assets`).
+`provider_usage_log`), `002_create_brand_assets.sql` (`brand_assets`) and
+`003_provider_configuration.sql` (provider `kind`, `config`, encrypted
+`secrets`, `secret_keys`, `priority` on `channel_providers`).
 Soft deletes via nullable `deleted_at` almost everywhere
 (`provider_usage_log` is the one intentional exception — pure append-only
 log). `brand_assets` additionally has `replaced_at`: a replaced asset is
@@ -139,7 +141,9 @@ are a 400, never a Postgres 22P02 surfacing as a 500.
 `APP_PORT`, `CORS_ORIGINS` (comma-separated allowed origins for the
 dashboard, defaults to `http://localhost:3000`) and `PUBLIC_URL` (absolute
 origin used for asset URLs in emails, defaults to
-`http://localhost:$APP_PORT`), are read by the server
+`http://localhost:$APP_PORT`) and `PROVIDER_SECRET_KEY` (encrypts provider
+credentials; `openssl rand -base64 32`; optional, but saving credentials
+fails with `ProviderSecretsUnavailable` until set), are read by the server
 itself via `apps/server/src/config/config.ts`. CORS is applied via
 `HttpMiddleware.cors` passed as the `middleware` option to
 `HttpRouter.serve` in `apps/server/src/index.ts` — not a separate layer.
@@ -176,6 +180,40 @@ scripts, handlers, external references or entities. `GET /api/asset/:id`
 serves bytes with the sniffed type, immutable caching, `nosniff`, and a
 sandboxing CSP for SVG.
 
+## Providers
+
+`packages/schema/src/providers/provider-kinds.ts` is the catalog of
+integrations (own-domain SMTP, SendGrid, Mailgun, Amazon SES, Postmark,
+Resend, Twilio, Vonage, Telegram bot): each kind's fields, which are
+secret, defaults and `validateProviderConfig`. The server validates with it
+and the dashboard renders provider forms from it — add a provider kind
+there, nowhere else. Secrets are AES-256-GCM encrypted
+(`apps/server/src/domain/providers/provider-secrets.ts`) with the provider
+id as associated data, and are never returned by the API — records expose
+only `secret_keys`. On update, a secret value of `""` keeps it, `null`
+clears it. `Providers.resolveProviderCredentials(id)` is the (non-HTTP)
+way for a future delivery worker to get decrypted settings.
+
+## Statistics
+
+`GET /api/stats/overview?days=30&timezone=Europe/Paris` (domain
+`apps/server/src/domain/stats/`) powers the overview dashboard: totals by
+status, previous-period totals, per-day series counted in the given
+timezone, channels, providers (attempts + cost from `provider_usage_log`),
+top event types / systems, recent failures, inventory. Deliveries are
+windowed by `created_at` with their current status. `bun run seed:demo`
+fills a dev database (name must contain dev/test/demo/local) with ~45 days
+of deterministic traffic.
+
+## Template editor
+
+`apps/web/components/template-editor.tsx` is CodeMirror 6: HTML mode for
+email, `{{ }}` highlighting, `{{` variable completion (payload keys +
+`system.*`), toolbar snippets, inline error marks from preview issues, and
+`@` image completion. Image suggestions come from the sources in
+`apps/web/lib/asset-sources.ts` (`ASSET_SOURCES`) — brand assets today; the
+planned file API plugs in as another `AssetSource` there.
+
 ## Tests
 
 - `bun run test` (repo root) — server unit + HTTP integration tests
@@ -185,8 +223,8 @@ sandboxing CSP for SVG.
   `apps/server/.env`. Image fixtures live in `test/fixtures/`.
 - `bun run typecheck` — `tsc -b` over server + schema.
 - `bun --cwd=apps/web run e2e` — Playwright e2e of the dashboard. Starts its
-  own API (port 3101, database `notification_e2e_test`, rebuilt each run)
-  and `next dev` (port 3201). Stop a running `dev:web` first — two
+  own API (port 3101, database `notification_e2e_test`, rebuilt and
+  demo-seeded each run) and `next dev` (port 3201). Stop a running `dev:web` first — two
   `next dev` processes can't share `apps/web/.next`.
 - `bun --cwd=apps/web run lint`.
 
@@ -196,8 +234,12 @@ sandboxing CSP for SVG.
   contacts/preferences, Swagger-documented.
 - `notifications` — templates (CRUD, validation, render/preview),
   notifications and deliveries endpoints. Nothing sends yet: there is no
-  delivery worker or provider integration.
+  delivery worker, and providers are configured but not called.
+- `providers` — configuration with encrypted credentials (see above).
+- `stats` — overview statistics (see above).
 - `assets` — complete (see above).
 - `apps/web` — admin dashboard covering all domains, wired to the API via
-  `@repo/schema`'s `HttpApiClient`. Template pages have a live preview;
-  external systems have a brand-assets panel. No auth in v1.
+  `@repo/schema`'s `HttpApiClient`. Overview is a statistics dashboard;
+  template pages have the CodeMirror editor + live preview; providers have
+  catalog-driven config forms; external systems have a brand-assets panel.
+  No auth in v1.

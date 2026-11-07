@@ -34,13 +34,16 @@ export default defineConfig({
   metadata: { apiUrl: API_URL },
   webServer: [
     {
-      // test/setup.ts refuses any database whose name lacks "test"
-      command: "bun test/setup.ts && bun src/index.ts",
+      // test/setup.ts refuses any database whose name lacks "test";
+      // seed-demo.ts adds deterministic traffic for the dashboard tests
+      command: "bun test/setup.ts && bun db/seed-demo.ts && bun src/index.ts",
       cwd:     "../server",
       url:     `${API_URL}/api/health`,
       env: {
         TEST_DB_NAME: DB_NAME,
         DB_NAME,
+        // test-only key so provider credentials can be saved in e2e runs
+        PROVIDER_SECRET_KEY: "e2e-only-provider-secret-key",
         APP_PORT:     String(API_PORT),
         CORS_ORIGINS: WEB_URL,
         PUBLIC_URL:   API_URL,

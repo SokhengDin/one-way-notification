@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { previewNotificationTemplate } from "../lib/api/notifications";
 import { errorIssues, errorMessage } from "../lib/errors";
+import { payloadPaths } from "../lib/template-variables";
 import { Card } from "./card";
 import { TextAreaField } from "./form-field";
 
@@ -18,6 +19,10 @@ interface TemplatePreviewProps {
   readonly subject:          string | null;
   /** Sample payload to start from, as JSON text. */
   readonly initialPayload?:  string;
+  /** server issues for the current draft (for inline editor diagnostics) */
+  readonly onIssuesChange?:  (issues: ReadonlyArray<string>) => void;
+  /** key paths of the sample payload (for editor completion) */
+  readonly onPayloadPathsChange?: (paths: ReadonlyArray<string>) => void;
 }
 
 type View = "rendered" | "text" | "source";
@@ -69,6 +74,8 @@ export function TemplatePreview({
   template,
   subject,
   initialPayload = "{}",
+  onIssuesChange,
+  onPayloadPathsChange,
 }: TemplatePreviewProps) {
   const [payloadText, setPayloadText] = useState(initialPayload);
   const [selectedView, setView]       = useState<View>("rendered");
@@ -95,7 +102,23 @@ export function TemplatePreview({
   });
 
   const result = previewQuery.data?.data;
-  const issues = previewQuery.isError ? errorIssues(previewQuery.error) : [];
+  const issues = useMemo(
+    () => (previewQuery.isError ? errorIssues(previewQuery.error) : []),
+    [previewQuery.isError, previewQuery.error],
+  );
+
+  const issuesKey = issues.join("\n");
+  useEffect(() => {
+    onIssuesChange?.(issues);
+    // compared by content, not identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [issuesKey]);
+
+  const pathsKey = "value" in parsed ? payloadPaths(parsed.value).join("\n") : "";
+  useEffect(() => {
+    onPayloadPathsChange?.(pathsKey ? pathsKey.split("\n") : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathsKey]);
 
   const fillSample = () => {
     if (!result) return;

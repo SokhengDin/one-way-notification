@@ -1,4 +1,4 @@
-import { Config, Context, Layer, Redacted } from "effect";
+import { Config, Context, Layer, Option, Redacted } from "effect";
 
 export type DatabaseConfig = {
   readonly host: string;
@@ -23,6 +23,9 @@ export type AppConfig = {
   // Absolute origin this API is reachable at from the outside world. Used to
   // build asset URLs embedded in emails, which must be absolute.
   readonly publicUrl: string;
+  // Encrypts provider credentials at rest. Optional so the API runs without
+  // it, but saving a provider with credentials fails until it is set.
+  readonly providerSecretKey: Option.Option<Redacted.Redacted<string>>;
 };
 
 const appPortConfig = Config.int("APP_PORT").pipe(Config.withDefault(3000));
@@ -37,6 +40,11 @@ const appConfig: Config.Config<AppConfig> = Config.all({
   publicUrl:   Config.string("PUBLIC_URL").pipe(
     Config.orElse(() => appPortConfig.pipe(Config.map((port) => `http://localhost:${port}`))),
     Config.map((url) => url.replace(/\/+$/, "")),
+  ),
+  providerSecretKey: Config.redacted("PROVIDER_SECRET_KEY").pipe(
+    Config.option,
+    // a blank `PROVIDER_SECRET_KEY=` line means "not set", never an empty key
+    Config.map(Option.filter((key) => Redacted.value(key).trim() !== "")),
   ),
 });
 

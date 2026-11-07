@@ -1,4 +1,4 @@
-import type { ChannelType } from "@repo/schema";
+import type { ChannelType, ProviderConfigValue } from "@repo/schema";
 import { runApi } from "../api-client";
 
 // ---------- channel_providers ----------
@@ -6,12 +6,17 @@ import { runApi } from "../api-client";
 export const listChannelProviders = (query: {
   skip?: number;
   limit?: number;
+  channel?: ChannelType;
 }) => runApi((client) => client.providers.listChannelProviders({ query }));
 
 export const addChannelProvider = (payload: {
   channel: ChannelType;
   name: string;
+  kind: string;
   is_active?: boolean;
+  priority?: number;
+  config: Record<string, ProviderConfigValue>;
+  secrets?: Record<string, string>;
 }) => runApi((client) => client.providers.addChannelProvider({ payload }));
 
 export const getChannelProviderById = (id: string) =>
@@ -21,7 +26,14 @@ export const getChannelProviderById = (id: string) =>
 
 export const updateChannelProvider = (
   id: string,
-  payload: { name?: string; is_active?: boolean },
+  payload: {
+    name?: string;
+    is_active?: boolean;
+    priority?: number;
+    config?: Record<string, ProviderConfigValue>;
+    /** string sets, null clears, omitted keeps */
+    secrets?: Record<string, string | null>;
+  },
 ) =>
   runApi((client) =>
     client.providers.updateChannelProvider({ params: { id }, payload }),

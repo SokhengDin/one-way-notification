@@ -12,6 +12,7 @@ import { ExternalSystemsApiHandlers } from "./domain/external-systems/external-s
 import { ProvidersApiHandlers } from "./domain/providers/providers.http";
 import { AssetsApiHandlers } from "./domain/assets/assets.http";
 import { SystemApiHandlers } from "./domain/system/system.http";
+import { StatsApiHandlers } from "./domain/stats/stats.http";
 
 const ApiLive = HttpApiBuilder.layer(Api).pipe(
   Layer.provide([
@@ -20,6 +21,7 @@ const ApiLive = HttpApiBuilder.layer(Api).pipe(
     ExternalSystemsApiHandlers,
     ProvidersApiHandlers,
     AssetsApiHandlers,
+    StatsApiHandlers,
     SystemApiHandlers,
   ]),
   Layer.provide(PgLive),

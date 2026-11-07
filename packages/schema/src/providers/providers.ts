@@ -1,6 +1,8 @@
 import { Effect, Schema } from "effect";
 import { channelTypeSchema } from "../enums";
 
+export const ProviderConfigValueSchema = Schema.Union([Schema.String, Schema.Number]);
+
 export class ChannelProviderRecord extends Schema.Class<ChannelProviderRecord>(
   "ChannelProviderRecord",
 )({
@@ -11,6 +13,13 @@ export class ChannelProviderRecord extends Schema.Class<ChannelProviderRecord>(
     Schema.optionalKey,
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
+  // catalog id (see provider-kinds.ts); null for legacy, unconfigured rows
+  kind: Schema.NullOr(Schema.String),
+  // non-secret settings only — secrets are never part of a record
+  config: Schema.Record(Schema.String, ProviderConfigValueSchema),
+  // which secret fields are set (values are write-only)
+  secret_keys: Schema.Array(Schema.String),
+  priority: Schema.Int,
   created_at: Schema.Date,
   updated_at: Schema.NullOr(Schema.Date),
   deleted_at: Schema.NullOr(Schema.Date),

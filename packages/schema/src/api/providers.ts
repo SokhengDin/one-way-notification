@@ -4,12 +4,15 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/ht
 import { channelTypeSchema } from "../enums";
 import {
   ChannelProviderRecord,
+  ProviderConfigValueSchema,
   ProviderUsageLogRecord,
 } from "../providers/providers";
 import {
   ChannelProviderConflict,
   ChannelProviderNotFound,
+  ProviderInvalid,
   ProviderRepoError,
+  ProviderSecretsUnavailable,
 } from "../providers/providers.errors";
 import { PaginatedData, PaginationQuery } from "../shared/pagination";
 import { ApiResponse } from "./response";
@@ -18,7 +21,10 @@ export class ProvidersApiGroup extends HttpApiGroup.make("providers")
   .add(
     // ---------- channel_providers ----------
     HttpApiEndpoint.get("listChannelProviders", "/channel-provider", {
-      query: PaginationQuery,
+      query: {
+        ...PaginationQuery,
+        channel: Schema.optional(channelTypeSchema),
+      },
       success: ApiResponse(PaginatedData(ChannelProviderRecord)),
       error: ProviderRepoError,
     }),
@@ -26,10 +32,15 @@ export class ProvidersApiGroup extends HttpApiGroup.make("providers")
       payload: Schema.Struct({
         channel: channelTypeSchema,
         name: Schema.String,
+        // a catalog id from PROVIDER_KINDS, matching the channel
+        kind: Schema.String,
         is_active: Schema.optional(Schema.Boolean),
+        priority: Schema.optional(Schema.Int),
+        config: Schema.Record(Schema.String, ProviderConfigValueSchema),
+        secrets: Schema.optional(Schema.Record(Schema.String, Schema.String)),
       }),
       success: ApiResponse(ChannelProviderRecord),
-      error: [ChannelProviderConflict, ProviderRepoError],
+      error: [ChannelProviderConflict, ProviderInvalid, ProviderSecretsUnavailable, ProviderRepoError],
     }),
     HttpApiEndpoint.get("getChannelProviderById", "/channel-provider/:id", {
       params: { id: Uuid },
@@ -41,11 +52,18 @@ export class ProvidersApiGroup extends HttpApiGroup.make("providers")
       payload: Schema.Struct({
         name: Schema.optional(Schema.String),
         is_active: Schema.optional(Schema.Boolean),
+        priority: Schema.optional(Schema.Int),
+        // replaces the whole non-secret config when given
+        config: Schema.optional(Schema.Record(Schema.String, ProviderConfigValueSchema)),
+        // per field: a string sets it, null clears it, omitted keeps it
+        secrets: Schema.optional(Schema.Record(Schema.String, Schema.NullOr(Schema.String))),
       }),
       success: ApiResponse(ChannelProviderRecord),
       error: [
         ChannelProviderNotFound,
         ChannelProviderConflict,
+        ProviderInvalid,
+        ProviderSecretsUnavailable,
         ProviderRepoError,
       ],
     }),

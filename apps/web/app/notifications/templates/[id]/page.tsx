@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Button } from "../../../../components/button";
 import { Card } from "../../../../components/card";
 import { ConfirmButton } from "../../../../components/confirm-button";
-import { TextAreaField, TextField } from "../../../../components/form-field";
+import { TextField } from "../../../../components/form-field";
+import { TemplateEditor } from "../../../../components/template-editor";
 import { PageHeader } from "../../../../components/page-header";
 import { ChannelBadge } from "../../../../components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,11 +43,15 @@ export default function NotificationTemplateDetailPage() {
 
   const [template, setTemplate] = useState("");
   const [subject, setSubject] = useState("");
+  const [previewIssues, setPreviewIssues] = useState<ReadonlyArray<string>>([]);
+  const [payloadVariables, setPayloadVariables] = useState<ReadonlyArray<string>>([]);
 
-  // reset the form whenever fresh data arrives (adjusted during render)
-  const [syncedFrom, setSyncedFrom] = useState(templateQuery.data);
-  if (templateQuery.data && templateQuery.data !== syncedFrom) {
-    setSyncedFrom(templateQuery.data);
+  // Fill the form once, from the first load. Later refetches (e.g. on window
+  // focus) must not overwrite unsaved edits; after a save the form already
+  // holds what was saved. Adjusted during render rather than in an effect.
+  const [loaded, setLoaded] = useState(false);
+  if (templateQuery.data && !loaded) {
+    setLoaded(true);
     setTemplate(templateQuery.data.data.template);
     setSubject(templateQuery.data.data.subject ?? "");
   }
@@ -158,13 +163,15 @@ export default function NotificationTemplateDetailPage() {
               required={data?.channel === "email"}
               hint={data?.channel === "email" ? "Required for email." : "Not used for this channel."}
             />
-            <TextAreaField
+            <TemplateEditor
               label="Template"
               value={template}
-              onChange={(event) => setTemplate(event.target.value)}
-              className="min-h-72 text-xs"
-              spellCheck={false}
-              hint='{{name}} inserts a value (HTML-escaped in email), {{{html}}} inserts raw HTML, {{name | default: "there"}} sets a fallback.'
+              onChange={setTemplate}
+              channel={data.channel}
+              externalSystemId={data.external_system_id}
+              variables={payloadVariables}
+              issues={previewIssues}
+              minHeight={360}
             />
             <div className="flex items-center gap-3">
               <Button type="submit" disabled={updateMutation.isPending || !isDirty}>
@@ -182,6 +189,8 @@ export default function NotificationTemplateDetailPage() {
             channel={data.channel}
             template={template}
             subject={subject || null}
+            onIssuesChange={setPreviewIssues}
+            onPayloadPathsChange={setPayloadVariables}
           />
         )}
       </div>

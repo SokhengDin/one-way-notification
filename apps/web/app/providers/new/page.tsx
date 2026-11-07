@@ -1,57 +1,56 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { CHANNEL_TYPES, type ChannelType } from "@repo/schema";
-import { Button } from "../../../components/button";
-import { Card } from "../../../components/card";
-import { CheckboxField, SelectField, TextField } from "../../../components/form-field";
+import { toast } from "sonner";
 import { PageHeader } from "../../../components/page-header";
+import { emptyProviderForm, ProviderForm } from "../../../components/provider-form";
 import { addChannelProvider } from "../../../lib/api/providers";
+import { errorIssues, errorMessage } from "../../../lib/errors";
 
 export default function NewProviderPage() {
-  const router = useRouter();
-  const [channel, setChannel] = useState<ChannelType>("email");
-  const [name, setName] = useState("");
-  const [isActive, setIsActive] = useState(true);
+  const router      = useRouter();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: () => addChannelProvider({ channel, name, is_active: isActive }),
-    onSuccess: (response) => router.push(`/providers/${response.data.id}`),
+    mutationFn: (submit: Parameters<React.ComponentProps<typeof ProviderForm>["onSubmit"]>[0]) =>
+      addChannelProvider({
+        channel:   submit.channel,
+        kind:      submit.kind,
+        name:      submit.name,
+        priority:  submit.priority,
+        is_active: submit.isActive,
+        config:    submit.config,
+        // nothing is stored yet, so there's nothing to clear
+        secrets:   Object.fromEntries(
+          Object.entries(submit.secrets).filter((entry): entry is [string, string] => entry[1] !== null),
+        ),
+      }),
+    onSuccess: (response) => {
+      toast.success("Provider created");
+      void queryClient.invalidateQueries({ queryKey: ["channel-providers"] });
+      router.push(`/providers/${response.data.id}`);
+    },
   });
 
   return (
     <div>
-      <PageHeader title="New provider" />
-      <Card>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            mutation.mutate();
-          }}
-        >
-          {mutation.isError && (
-            <p className="text-sm text-destructive">
-              {mutation.error instanceof Error ? mutation.error.message : "Failed to create provider."}
-            </p>
-          )}
-          <SelectField
-            label="Channel"
-            value={channel}
-            onValueChange={(value) => setChannel(value as ChannelType)}
-            options={CHANNEL_TYPES.map((value) => ({ value, label: value }))}
-          />
-          <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
-          <CheckboxField label="Active" checked={isActive} onCheckedChange={setIsActive} />
-          <div>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Creating…" : "Create provider"}
-            </Button>
-          </div>
-        </form>
-      </Card>
+      <PageHeader
+        title="New provider"
+        description="Connect an email service, your own domain over SMTP, an SMS gateway or a Telegram bot."
+      />
+      <ProviderForm
+        existing={null}
+        initial={emptyProviderForm()}
+        isPending={mutation.isPending}
+        serverError={
+          mutation.isError
+            ? { message: errorMessage(mutation.error, "Failed to create provider."), issues: errorIssues(mutation.error) }
+            : null
+        }
+        submitLabel="Create provider"
+        onSubmit={(submit) => mutation.mutate(submit)}
+      />
     </div>
   );
 }
