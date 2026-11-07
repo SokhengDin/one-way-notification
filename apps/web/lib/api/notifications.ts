@@ -87,3 +87,24 @@ export const updateNotificationDeliveryStatus = (
       payload,
     }),
   );
+
+// ---------- rendering ----------
+
+export const renderNotificationTemplate = (id: string, payload: Record<string, unknown>) =>
+  runApi((client) =>
+    client.notifications.renderNotificationTemplate({
+      params: { id },
+      payload: { payload },
+    }),
+  );
+
+export const previewNotificationTemplate = (payload: {
+  external_system_id: string;
+  channel: ChannelType;
+  template: string;
+  subject: string | null;
+  payload: Record<string, unknown>;
+}) =>
+  runApi((client) =>
+    client.notifications.previewNotificationTemplate({ payload }),
+  );

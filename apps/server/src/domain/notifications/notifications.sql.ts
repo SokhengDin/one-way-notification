@@ -97,7 +97,10 @@ export function makeSqlNotificationRepo(
         UPDATE notification_templates
         SET
           template = COALESCE(${input.template ?? null}, template),
-          subject = COALESCE(${input.subject ?? null}, subject),
+          -- omitted subject keeps the current value; an explicit null clears it
+          subject = CASE WHEN ${input.subject !== undefined}::boolean
+                         THEN ${input.subject ?? null}::text
+                         ELSE subject END,
           updated_at = now()
         WHERE id = ${id} AND deleted_at IS NULL
         RETURNING id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at

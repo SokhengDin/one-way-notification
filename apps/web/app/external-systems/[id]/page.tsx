@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ExternalUserLinkRecord } from "@repo/schema";
+import { BrandAssets } from "../../../components/brand-assets";
 import { Button } from "../../../components/button";
+import { ConfirmButton } from "../../../components/confirm-button";
 import { Card } from "../../../components/card";
 import { TextField } from "../../../components/form-field";
 import { DataTable, type DataTableColumn } from "../../../components/data-table";
@@ -50,12 +52,14 @@ export default function ExternalSystemDetailPage() {
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
 
-  useEffect(() => {
-    if (systemQuery.data) {
-      setName(systemQuery.data.data.name);
-      setApiKey(systemQuery.data.data.api_key);
-    }
-  }, [systemQuery.data]);
+  // reset the form whenever fresh data arrives (state adjusted during render,
+  // not in an effect — see react.dev "you might not need an effect")
+  const [syncedFrom, setSyncedFrom] = useState(systemQuery.data);
+  if (systemQuery.data && systemQuery.data !== syncedFrom) {
+    setSyncedFrom(systemQuery.data);
+    setName(systemQuery.data.data.name);
+    setApiKey(systemQuery.data.data.api_key);
+  }
 
   const updateMutation = useMutation({
     mutationFn: () => updateExternalSystem(systemId, { name, api_key: apiKey }),
@@ -84,9 +88,13 @@ export default function ExternalSystemDetailPage() {
       <PageHeader
         title={systemQuery.data?.data.name ?? "External system"}
         actions={
-          <Button variant="danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
-            {deleteMutation.isPending ? "Deleting…" : "Delete system"}
-          </Button>
+          <ConfirmButton
+            label="Delete system"
+            title="Delete this external system?"
+            description="It will no longer be able to send notifications. Its templates and assets stay in the database."
+            isPending={deleteMutation.isPending}
+            onConfirm={() => deleteMutation.mutate()}
+          />
         }
       />
 
@@ -124,6 +132,8 @@ export default function ExternalSystemDetailPage() {
           </div>
         </form>
       </Card>
+
+      <BrandAssets systemId={systemId} />
 
       <Card title="Linked users">
         <DataTable

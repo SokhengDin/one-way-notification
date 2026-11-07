@@ -1,15 +1,29 @@
 import {
   NotificationDeliveryNotFound,
   NotificationNotFound,
+  NotificationRepoError,
+  NotificationTemplateInvalid,
   NotificationTemplateNotFound,
+  RenderedTemplate,
+  type ChannelType,
 } from "@repo/schema";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/unstable/sql/SqlClient";
+import { AppConfigLive, AppConfigService } from "../../config/config";
+import { AssetsRepo } from "../assets/assets";
+import { ExternalSystemsRepo } from "../external-systems/external-systems";
+import { renderForChannel, validateTemplateFields } from "./notifications.render";
 import { makeSqlNotificationRepo } from "./notifications.sql";
 import type {
   NotificationRepoService as NotificationRepoServiceShape,
   NotificationsService,
 } from "./notifications.types";
+
+const invalid = (problems: ReadonlyArray<string>) =>
+  new NotificationTemplateInvalid({
+    message: problems.length === 1 ? problems[0]! : `Template has ${problems.length} problems`,
+    issues:  [...problems],
+  });
 
 export class NotificationsRepo extends Context.Service<
   NotificationsRepo,
@@ -31,7 +45,50 @@ export class Notifications extends Context.Service<
   static readonly layer = Layer.effect(
     Notifications,
     Effect.gen(function* () {
-      const repo = yield* NotificationsRepo;
+      const repo            = yield* NotificationsRepo;
+      const externalSystems = yield* ExternalSystemsRepo;
+      const assets          = yield* AssetsRepo;
+      const config          = yield* AppConfigService;
+
+      // The external system (for its name) and its current brand assets.
+      // `null` when the system doesn't exist or is deleted.
+      const loadBranding = Effect.fn("Notifications.loadBranding")(function* (
+        externalSystemId: string,
+      ) {
+        const system = yield* externalSystems.findExternalSystemById(externalSystemId);
+        if (system === null) return null;
+        const systemAssets = yield* assets.listAssets(externalSystemId);
+        return { systemName: system.name, assets: systemAssets };
+      }, Effect.mapError((cause) =>
+        new NotificationRepoError({
+          message:   "Failed to load the external system's branding",
+          operation: "loadTemplateBranding",
+          cause,
+        }),
+      ));
+
+      const render = Effect.fn("Notifications.render")(function* (input: {
+        readonly external_system_id: string;
+        readonly channel:            ChannelType;
+        readonly template:           string;
+        readonly subject:            string | null;
+        readonly payload:            Record<string, unknown>;
+      }) {
+        const branding = yield* loadBranding(input.external_system_id);
+        if (branding === null) {
+          return yield* invalid([`external_system_id: no external system with id ${input.external_system_id}`]);
+        }
+        const result = renderForChannel({ ...input, ...branding, publicUrl: config.publicUrl });
+        if ("problems" in result) {
+          return yield* invalid(result.problems);
+        }
+        return new RenderedTemplate({
+          ...result,
+          variables: [...result.variables],
+          missing:   [...result.missing],
+          warnings:  [...result.warnings],
+        });
+      });
 
       // ---------- notification_templates ----------
 
@@ -39,6 +96,14 @@ export class Notifications extends Context.Service<
         Effect.fn("Notifications.addNotificationTemplate")(function* (
           input,
         ) {
+          const problems = validateTemplateFields(input);
+          if (problems.length > 0) {
+            return yield* invalid(problems);
+          }
+          const branding = yield* loadBranding(input.external_system_id);
+          if (branding === null) {
+            return yield* invalid([`external_system_id: no external system with id ${input.external_system_id}`]);
+          }
           return yield* repo.addNotificationTemplate(input);
         });
 
@@ -65,11 +130,43 @@ export class Notifications extends Context.Service<
           id,
           input,
         ) {
+          const current = yield* repo.findNotificationTemplateById(id);
+          if (current === null) {
+            return yield* new NotificationTemplateNotFound({ id });
+          }
+          // validate the template as it will be after the patch
+          const problems = validateTemplateFields({
+            channel:  current.channel,
+            template: input.template ?? current.template,
+            subject:  input.subject !== undefined ? input.subject : current.subject,
+          });
+          if (problems.length > 0) {
+            return yield* invalid(problems);
+          }
           const template = yield* repo.updateNotificationTemplate(id, input);
           if (template === null) {
             return yield* new NotificationTemplateNotFound({ id });
           }
           return template;
+        });
+
+      const renderNotificationTemplate: NotificationsService["renderNotificationTemplate"] =
+        Effect.fn("Notifications.renderNotificationTemplate")(function* (
+          id,
+          payload,
+        ) {
+          const template = yield* repo.findNotificationTemplateById(id);
+          if (template === null) {
+            return yield* new NotificationTemplateNotFound({ id });
+          }
+          return yield* render({ ...template, payload });
+        });
+
+      const previewNotificationTemplate: NotificationsService["previewNotificationTemplate"] =
+        Effect.fn("Notifications.previewNotificationTemplate")(function* (
+          input,
+        ) {
+          return yield* render(input);
         });
 
       const deleteNotificationTemplate: NotificationsService["deleteNotificationTemplate"] =
@@ -135,6 +232,8 @@ export class Notifications extends Context.Service<
         getNotificationTemplateById,
         listNotificationTemplates,
         updateNotificationTemplate,
+        renderNotificationTemplate,
+        previewNotificationTemplate,
         deleteNotificationTemplate,
         addNotification,
         getNotificationById,
@@ -143,5 +242,12 @@ export class Notifications extends Context.Service<
         updateNotificationDeliveryStatus,
       };
     }),
-  ).pipe(Layer.provide(NotificationsRepo.layer));
+  ).pipe(
+    Layer.provide([
+      NotificationsRepo.layer,
+      ExternalSystemsRepo.layer,
+      AssetsRepo.layer,
+      AppConfigLive,
+    ]),
+  );
 }

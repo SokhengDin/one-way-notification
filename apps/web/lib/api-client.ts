@@ -3,7 +3,7 @@ import { Context, Effect, Layer, ManagedRuntime } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { HttpApiClient } from "effect/unstable/httpapi";
 
-const API_BASE_URL =
+export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3000";
 
 export class ApiClient extends Context.Service<
@@ -20,4 +20,10 @@ const runtime = ManagedRuntime.make(ApiClient.layer);
 
 export const runApi = <A, E>(
   f: (client: HttpApiClient.ForApi<typeof Api>) => Effect.Effect<A, E>,
-): Promise<A> => runtime.runPromise(ApiClient.use(f));
+): Promise<A> =>
+  runtime.runPromise(
+    Effect.gen(function* () {
+      const client = yield* ApiClient;
+      return yield* f(client);
+    }),
+  );

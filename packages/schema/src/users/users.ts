@@ -3,9 +3,9 @@ import { channelTypeSchema } from "../enums";
 
 export class UserRecord extends Schema.Class<UserRecord>("UserRecord")({
   id: Schema.String,
-  created_at: Schema.String,
-  updated_at: Schema.NullOr(Schema.String),
-  deleted_at: Schema.NullOr(Schema.String),
+  created_at: Schema.Date,
+  updated_at: Schema.NullOr(Schema.Date),
+  deleted_at: Schema.NullOr(Schema.Date),
 }) {}
 
 export class UserContactRecord extends Schema.Class<UserContactRecord>(
@@ -17,9 +17,9 @@ export class UserContactRecord extends Schema.Class<UserContactRecord>(
   address: Schema.NullOr(Schema.String),
   linked: Schema.Boolean,
   verified: Schema.Boolean,
-  created_at: Schema.String,
-  updated_at: Schema.String,
-  deleted_at: Schema.NullOr(Schema.String),
+  created_at: Schema.Date,
+  updated_at: Schema.Date,
+  deleted_at: Schema.NullOr(Schema.Date),
 }) {}
 
 export class UserPreferenceRecord extends Schema.Class<UserPreferenceRecord>(

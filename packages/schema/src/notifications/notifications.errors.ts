@@ -15,6 +15,8 @@ export const NotificationRepoOperation = Schema.Literals([
   "addNotificationDelivery",
   "listNotificationDeliveries",
   "updateNotificationDeliveryStatus",
+  // rendering: loading the external system + its brand assets
+  "loadTemplateBranding",
 ]);
 
 export type NotificationRepoOperation = typeof NotificationRepoOperation.Type;
@@ -69,4 +71,15 @@ export class NotificationDeliveryNotFound extends Schema.TaggedErrorClass<Notifi
     id: Schema.String,
   },
   { httpApiStatus: 404 },
+) {}
+
+// The template body or subject is unusable: syntax error, missing required
+// subject for email, or it references an external system that doesn't exist.
+export class NotificationTemplateInvalid extends Schema.TaggedErrorClass<NotificationTemplateInvalid>()(
+  "NotificationTemplateInvalid",
+  {
+    message: Schema.String,
+    issues:  Schema.optionalKey(Schema.Array(Schema.String)),
+  },
+  { httpApiStatus: 422 },
 ) {}

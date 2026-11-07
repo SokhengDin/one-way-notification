@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@effect/platform-bun": "^4.0.0-beta.102",

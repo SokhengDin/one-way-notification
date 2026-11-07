@@ -107,36 +107,97 @@ aggregating every domain's `HttpApiGroup`). Each domain group gets its own
 path prefix via `.prefix("/user")` on the group; a global prefix (if ever
 needed) goes on `Api` itself via `.prefix(...)`.
 
-`apps/server/src/index.ts` is the single composition root — it assembles
-config, Postgres, every domain's handler layer, the Bun HTTP server, Swagger
-(`/docs`), and the pretty console logger, then runs via `BunRuntime.runMain`
-+ `Layer.launch`. There is intentionally no second copy of this wiring
-elsewhere — if you add a domain, wire its `*ApiHandlers` layer and its
-service's `PgLive`-provided layer directly into this file.
+`apps/server/src/app.ts` is the single composition root for routes — it
+assembles Postgres, every domain's handler layer and Swagger (`/docs`) into
+`AppRoutes`. `apps/server/src/index.ts` only launches it (config, Bun HTTP
+server, CORS, pretty logger, `BunRuntime.runMain` + `Layer.launch`); the
+test suite mounts the same `AppRoutes` in-process via
+`HttpRouter.toWebHandler`. There is intentionally no second copy of this
+wiring — if you add a domain, wire its `*ApiHandlers` layer into `app.ts`.
 
 ## Database
 
-Single migration file so far: `apps/server/db/migrations/001_create_tables.sql`.
-Tables: `external_systems`, `users`, `external_user_links`, `user_contacts`,
-`user_preferences`, `notification_templates`, `channel_providers`,
-`notifications`, `notification_deliveries`, `provider_usage_log`. Soft
-deletes via nullable `deleted_at` almost everywhere (`provider_usage_log` is
-the one intentional exception — pure append-only log).
+Migrations in `apps/server/db/migrations/`, applied in filename order:
+`001_create_tables.sql` (`external_systems`, `users`, `external_user_links`,
+`user_contacts`, `user_preferences`, `notification_templates`,
+`channel_providers`, `notifications`, `notification_deliveries`,
+`provider_usage_log`) and `002_create_brand_assets.sql` (`brand_assets`).
+Soft deletes via nullable `deleted_at` almost everywhere
+(`provider_usage_log` is the one intentional exception — pure append-only
+log). `brand_assets` additionally has `replaced_at`: a replaced asset is
+still served (sent emails reference its URL), a deleted one is not.
+
+Record schemas in `@repo/schema` type every timestamp as `Schema.Date` —
+that's what the `pg` driver returns. Repos must wrap rows in the record
+class (`new XRecord(row)`); returning a plain row fails response encoding.
+Every id in the HTTP contract uses the shared `Uuid` schema so malformed ids
+are a 400, never a Postgres 22P02 surfacing as a 500.
 
 `bun run migrate` (from repo root) runs `apps/server/db/migrate.ts` against
 `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASS` — loaded from
 `apps/server/.env` (copy `apps/server/.env.example`). Same vars, plus
-`APP_PORT` and `CORS_ORIGINS` (comma-separated allowed origins for the
-dashboard, defaults to `http://localhost:3000`), are read by the server
+`APP_PORT`, `CORS_ORIGINS` (comma-separated allowed origins for the
+dashboard, defaults to `http://localhost:3000`) and `PUBLIC_URL` (absolute
+origin used for asset URLs in emails, defaults to
+`http://localhost:$APP_PORT`), are read by the server
 itself via `apps/server/src/config/config.ts`. CORS is applied via
 `HttpMiddleware.cors` passed as the `middleware` option to
 `HttpRouter.serve` in `apps/server/src/index.ts` — not a separate layer.
+
+## Templates and rendering
+
+`apps/server/src/domain/notifications/`:
+
+- `template-engine.ts` — pure parser/renderer. `{{path}}` (HTML-escaped for
+  email bodies), `{{{path}}}` (raw), `{{path | default: "x"}}`, `\{{`
+  literal. Dotted paths with array indexes; own properties only.
+- `notifications.render.ts` — pure channel rules: save-time validation
+  (`validateTemplateFields`: syntax, email needs a subject), `system.*`
+  built-in variables (name + asset URLs), email layout + text part, SMS
+  segment / Telegram length warnings, logo choice (`email_header` → `logo`,
+  raster preferred over SVG/WebP/ICO, which Gmail/Outlook don't show).
+- `email-layout.ts` — table-based, inline-styled 600px layout; templates
+  containing `<html` skip it.
+
+Invalid templates are `NotificationTemplateInvalid` (422, with `issues`).
+`POST /api/notification-template/:id/render` renders a saved template;
+`POST /api/notification-template/preview` renders an unsaved draft (the
+dashboard's live preview).
+
+## Brand assets
+
+`apps/server/src/domain/assets/`. One current asset per (system, kind),
+kinds `logo | logo_dark | icon | email_header`. Upload is
+`PUT /api/external-system/:id/asset/:kind` with base64 `data` (a `data:`
+URL prefix is accepted). `image-inspect.ts` identifies the format from the
+bytes only (PNG, JPEG, GIF, WebP VP8/VP8L/VP8X, SVG, ICO), reads
+dimensions, caps size (2 MiB) and pixels (8192/side), and rejects SVGs with
+scripts, handlers, external references or entities. `GET /api/asset/:id`
+serves bytes with the sniffed type, immutable caching, `nosniff`, and a
+sandboxing CSP for SVG.
+
+## Tests
+
+- `bun run test` (repo root) — server unit + HTTP integration tests
+  (`apps/server/test/`). The preload (`test/setup.ts`) creates and rebuilds
+  `notification_test` (override with `TEST_DB_NAME`; it refuses any name
+  without "test") using `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASS` from
+  `apps/server/.env`. Image fixtures live in `test/fixtures/`.
+- `bun run typecheck` — `tsc -b` over server + schema.
+- `bun --cwd=apps/web run e2e` — Playwright e2e of the dashboard. Starts its
+  own API (port 3101, database `notification_e2e_test`, rebuilt each run)
+  and `next dev` (port 3201). Stop a running `dev:web` first — two
+  `next dev` processes can't share `apps/web/.next`.
+- `bun --cwd=apps/web run lint`.
 
 ## Current domain status
 
 - `users` — complete: repo/service/handler layers, full CRUD +
   contacts/preferences, Swagger-documented.
-- `notifications` — schema/types only, no service or HTTP layer yet.
-- `apps/web` — admin dashboard covering all 5 domains (users, notifications,
-  external-systems, providers, system overview), wired to the API via
-  `@repo/schema`'s `HttpApiClient`. No auth in v1.
+- `notifications` — templates (CRUD, validation, render/preview),
+  notifications and deliveries endpoints. Nothing sends yet: there is no
+  delivery worker or provider integration.
+- `assets` — complete (see above).
+- `apps/web` — admin dashboard covering all domains, wired to the API via
+  `@repo/schema`'s `HttpApiClient`. Template pages have a live preview;
+  external systems have a brand-assets panel. No auth in v1.

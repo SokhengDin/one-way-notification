@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { Uuid } from "../shared/ids";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import { channelTypeSchema } from "../enums";
 import {
@@ -27,23 +28,23 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
       error: UserRepoError,
     }),
     HttpApiEndpoint.get("getUserById", "/:id", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       success: ApiResponse(UserRecord),
       error: [UserNotFound, UserRepoError],
     }),
     HttpApiEndpoint.make("DELETE")("deleteUser", "/:id", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       success: HttpApiSchema.NoContent,
       error: [UserNotFound, UserRepoError],
     }),
     HttpApiEndpoint.get("listUserContacts", "/:id/contacts", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       query: PaginationQuery,
       success: ApiResponse(PaginatedData(UserContactRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.post("addUserContact", "/:id/contacts", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       payload: Schema.Struct({
         channel: channelTypeSchema,
         address: Schema.NullOr(Schema.String),
@@ -54,12 +55,12 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
       error: [UserContactConflict, UserRepoError],
     }),
     HttpApiEndpoint.get("getUserContact", "/:id/contacts/:channel", {
-      params: { id: Schema.String, channel: channelTypeSchema },
+      params: { id: Uuid, channel: channelTypeSchema },
       success: ApiResponse(UserContactRecord),
       error: [UserContactNotFound, UserRepoError],
     }),
     HttpApiEndpoint.patch("updateUserContact", "/:id/contacts/:channel", {
-      params: { id: Schema.String, channel: channelTypeSchema },
+      params: { id: Uuid, channel: channelTypeSchema },
       payload: Schema.Struct({
         address: Schema.optional(Schema.NullOr(Schema.String)),
         linked: Schema.optional(Schema.Boolean),
@@ -69,13 +70,13 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
       error: [UserContactNotFound, UserRepoError],
     }),
     HttpApiEndpoint.get("listUserPreferences", "/:id/preferences", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       query: PaginationQuery,
       success: ApiResponse(PaginatedData(UserPreferenceRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.put("setUserPreference", "/:id/preferences", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       payload: Schema.Struct({
         channel: channelTypeSchema,
         enabled: Schema.Boolean,

@@ -1,15 +1,8 @@
-import { Api } from "@repo/schema";
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer, Logger } from "effect";
-import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
-import { HttpMiddleware, HttpRouter } from "effect/unstable/http";
+import { HttpRouter } from "effect/unstable/http";
+import { AppRoutes, corsMiddleware } from "./app";
 import { AppConfigLive, AppConfigService } from "./config/config";
-import { PgLive } from "./pg";
-import { UsersApiHandlers } from "./domain/users/users.http";
-import { NotificationsApiHandlers } from "./domain/notifications/notifications.http";
-import { ExternalSystemsApiHandlers } from "./domain/external-systems/external-systems.http";
-import { ProvidersApiHandlers } from "./domain/providers/providers.http";
-import { SystemApiHandlers } from "./domain/system/system.http";
 
 const LoggerLive = Logger.layer([
   Logger.consolePretty({
@@ -18,21 +11,6 @@ const LoggerLive = Logger.layer([
     formatDate: (date) => date.toLocaleTimeString(),
   }),
 ]);
-
-const ApiLive = HttpApiBuilder.layer(Api).pipe(
-  Layer.provide([
-    UsersApiHandlers,
-    NotificationsApiHandlers,
-    ExternalSystemsApiHandlers,
-    ProvidersApiHandlers,
-    SystemApiHandlers,
-  ]),
-  Layer.provide(PgLive),
-);
-
-const SwaggerLive = HttpApiSwagger.layer(Api, { path: "/docs" });
-
-const AllRoutes = Layer.mergeAll(ApiLive, SwaggerLive);
 
 const BunHttpServerLive = Layer.unwrap(
   Effect.gen(function* () {
@@ -44,11 +22,8 @@ const BunHttpServerLive = Layer.unwrap(
 const ServedRoutesLive = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* AppConfigService;
-    return HttpRouter.serve(AllRoutes, {
-      middleware: HttpMiddleware.cors({
-        allowedOrigins: config.corsOrigins,
-        allowedMethods: ["GET", "POST", "PATCH", "PUT", "DELETE"],
-      }),
+    return HttpRouter.serve(AppRoutes, {
+      middleware: corsMiddleware(config.corsOrigins),
     });
   }),
 ).pipe(Layer.provide(AppConfigLive));

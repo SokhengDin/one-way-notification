@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { ChannelType } from "@repo/schema";
 import { Button } from "../../../../../components/button";
 import { Card } from "../../../../../components/card";
@@ -24,13 +24,14 @@ export default function EditUserContactPage() {
   const [linked, setLinked] = useState(false);
   const [verified, setVerified] = useState(false);
 
-  useEffect(() => {
-    if (contactQuery.data) {
-      setAddress(contactQuery.data.data.address ?? "");
-      setLinked(contactQuery.data.data.linked);
-      setVerified(contactQuery.data.data.verified);
-    }
-  }, [contactQuery.data]);
+  // reset the form whenever fresh data arrives (adjusted during render)
+  const [syncedFrom, setSyncedFrom] = useState(contactQuery.data);
+  if (contactQuery.data && contactQuery.data !== syncedFrom) {
+    setSyncedFrom(contactQuery.data);
+    setAddress(contactQuery.data.data.address ?? "");
+    setLinked(contactQuery.data.data.linked);
+    setVerified(contactQuery.data.data.verified);
+  }
 
   const mutation = useMutation({
     mutationFn: () => updateUserContact(userId, channel, { address: address || null, linked, verified }),

@@ -26,5 +26,5 @@ export class ProviderUsageLogRecord extends Schema.Class<ProviderUsageLogRecord>
   status_code: Schema.NullOr(Schema.Int),
   cost: Schema.NullOr(Schema.String),
   raw_response: Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)),
-  attempted_at: Schema.String,
+  attempted_at: Schema.Date,
 }) {}
