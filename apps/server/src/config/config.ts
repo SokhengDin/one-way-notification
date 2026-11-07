@@ -20,14 +20,23 @@ export type AppConfig = {
   readonly db: DatabaseConfig;
   readonly appPort: number;
   readonly corsOrigins: ReadonlyArray<string>;
+  // Absolute origin this API is reachable at from the outside world. Used to
+  // build asset URLs embedded in emails, which must be absolute.
+  readonly publicUrl: string;
 };
+
+const appPortConfig = Config.int("APP_PORT").pipe(Config.withDefault(3000));
 
 const appConfig: Config.Config<AppConfig> = Config.all({
   db:          databaseConfig,
-  appPort:     Config.int("APP_PORT").pipe(Config.withDefault(3000)),
+  appPort:     appPortConfig,
   corsOrigins: Config.string("CORS_ORIGINS").pipe(
     Config.map((value) => value.split(",").map((origin) => origin.trim()).filter((origin) => origin.length > 0)),
     Config.withDefault(["http://localhost:3000"]),
+  ),
+  publicUrl:   Config.string("PUBLIC_URL").pipe(
+    Config.orElse(() => appPortConfig.pipe(Config.map((port) => `http://localhost:${port}`))),
+    Config.map((url) => url.replace(/\/+$/, "")),
   ),
 });
 

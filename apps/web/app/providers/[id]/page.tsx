@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "../../../components/button";
 import { Card } from "../../../components/card";
 import { CheckboxField, TextField } from "../../../components/form-field";
@@ -23,12 +23,13 @@ export default function ProviderDetailPage() {
   const [name, setName] = useState("");
   const [isActive, setIsActive] = useState(true);
 
-  useEffect(() => {
-    if (providerQuery.data) {
-      setName(providerQuery.data.data.name);
-      setIsActive(providerQuery.data.data.is_active ?? true);
-    }
-  }, [providerQuery.data]);
+  // reset the form whenever fresh data arrives (adjusted during render)
+  const [syncedFrom, setSyncedFrom] = useState(providerQuery.data);
+  if (providerQuery.data && providerQuery.data !== syncedFrom) {
+    setSyncedFrom(providerQuery.data);
+    setName(providerQuery.data.data.name);
+    setIsActive(providerQuery.data.data.is_active ?? true);
+  }
 
   const updateMutation = useMutation({
     mutationFn: () => updateChannelProvider(providerId, { name, is_active: isActive }),

@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { Uuid } from "../shared/ids";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
 import {
   ExternalSystemRecord,
@@ -36,12 +37,12 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       error: [ExternalSystemConflict, ExternalSystemRepoError],
     }),
     HttpApiEndpoint.get("getExternalSystemById", "/external-system/:id", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       success: ApiResponse(ExternalSystemRecord),
       error: [ExternalSystemNotFound, ExternalSystemRepoError],
     }),
     HttpApiEndpoint.patch("updateExternalSystem", "/external-system/:id", {
-      params: { id: Schema.String },
+      params: { id: Uuid },
       payload: Schema.Struct({
         name: Schema.optional(Schema.String),
         api_key: Schema.optional(Schema.String),
@@ -57,7 +58,7 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       "deleteExternalSystem",
       "/external-system/:id",
       {
-        params: { id: Schema.String },
+        params: { id: Uuid },
         success: HttpApiSchema.NoContent,
         error: [ExternalSystemNotFound, ExternalSystemRepoError],
       },
@@ -68,7 +69,7 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       "listExternalUserLinksByUser",
       "/external-system/user/:userId/link",
       {
-        params: { userId: Schema.String },
+        params: { userId: Uuid },
         query: PaginationQuery,
         success: ApiResponse(PaginatedData(ExternalUserLinkRecord)),
         error: ExternalSystemRepoError,
@@ -78,7 +79,7 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       "listExternalUserLinksBySystem",
       "/external-system/:externalSystemId/link",
       {
-        params: { externalSystemId: Schema.String },
+        params: { externalSystemId: Uuid },
         query: PaginationQuery,
         success: ApiResponse(PaginatedData(ExternalUserLinkRecord)),
         error: ExternalSystemRepoError,
@@ -88,10 +89,10 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       "addExternalUserLink",
       "/external-system/:externalSystemId/link",
       {
-        params: { externalSystemId: Schema.String },
+        params: { externalSystemId: Uuid },
         payload: Schema.Struct({
           external_user_id: Schema.String,
-          user_id: Schema.String,
+          user_id: Uuid,
         }),
         success: ApiResponse(ExternalUserLinkRecord),
         error: [ExternalUserLinkConflict, ExternalSystemRepoError],
@@ -101,7 +102,7 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       "deleteExternalUserLink",
       "/external-system/link/:id",
       {
-        params: { id: Schema.String },
+        params: { id: Uuid },
         success: HttpApiSchema.NoContent,
         error: [ExternalUserLinkNotFound, ExternalSystemRepoError],
       },

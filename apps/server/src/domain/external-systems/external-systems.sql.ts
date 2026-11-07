@@ -42,7 +42,7 @@ export function makeSqlExternalSystemsRepo(
         ),
       );
 
-      return rows[0]!;
+      return new ExternalSystemRecord(rows[0]!);
     });
 
   const findExternalSystemById: ExternalSystemRepoService["findExternalSystemById"] =
@@ -53,7 +53,7 @@ export function makeSqlExternalSystemsRepo(
         WHERE id = ${id} AND deleted_at IS NULL
       `.pipe(mapSqlError("findExternalSystemById"));
 
-      return rows[0] ?? null;
+      return rows[0] ? new ExternalSystemRecord(rows[0]) : null;
     });
 
   const listExternalSystems: ExternalSystemRepoService["listExternalSystems"] =
@@ -109,7 +109,7 @@ export function makeSqlExternalSystemsRepo(
         ),
       );
 
-      return rows[0] ?? null;
+      return rows[0] ? new ExternalSystemRecord(rows[0]) : null;
     });
 
   const deleteExternalSystem: ExternalSystemRepoService["deleteExternalSystem"] =
@@ -147,7 +147,7 @@ export function makeSqlExternalSystemsRepo(
         ),
       );
 
-      return rows[0]!;
+      return new ExternalUserLinkRecord(rows[0]!);
     });
 
   const listExternalUserLinksByUser: ExternalSystemRepoService["listExternalUserLinksByUser"] =

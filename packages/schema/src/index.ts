@@ -15,3 +15,7 @@ export * from "./external-systems/external-systems";
 export * from "./external-systems/external-systems.errors";
 export * from "./providers/providers";
 export * from "./providers/providers.errors";
+export * from "./shared/ids";
+export * from "./assets/assets";
+export * from "./assets/assets.errors";
+export * from "./api/assets";

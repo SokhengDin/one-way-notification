@@ -31,6 +31,16 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
           .updateNotificationTemplate(params.id, payload)
           .pipe(Effect.map((data) => ok(data))),
       )
+      .handle("renderNotificationTemplate", ({ params, payload }) =>
+        notifications
+          .renderNotificationTemplate(params.id, payload.payload)
+          .pipe(Effect.map((data) => ok(data))),
+      )
+      .handle("previewNotificationTemplate", ({ payload }) =>
+        notifications
+          .previewNotificationTemplate(payload)
+          .pipe(Effect.map((data) => ok(data))),
+      )
       .handle("deleteNotificationTemplate", ({ params }) =>
         notifications.deleteNotificationTemplate(params.id),
       )

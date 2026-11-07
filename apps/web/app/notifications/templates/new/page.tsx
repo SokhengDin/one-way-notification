@@ -11,6 +11,8 @@ import { SelectField, TextAreaField, TextField } from "../../../../components/fo
 import { PageHeader } from "../../../../components/page-header";
 import { listExternalSystems } from "../../../../lib/api/external-systems";
 import { addNotificationTemplate, listNotificationTemplates } from "../../../../lib/api/notifications";
+import { TemplatePreview } from "../../../../components/template-preview";
+import { errorIssues, errorMessage } from "../../../../lib/errors";
 
 export default function NewNotificationTemplatePage() {
   const router = useRouter();
@@ -49,10 +51,13 @@ export default function NewNotificationTemplatePage() {
     onSuccess: (response) => router.push(`/notifications/templates/${response.data.id}`),
   });
 
+  const saveIssues = mutation.isError ? errorIssues(mutation.error) : [];
+
   return (
     <div>
       <PageHeader title="New template" />
-      <Card>
+      <div className="grid gap-6 xl:grid-cols-2">
+      <Card title="Template">
         <form
           className="flex flex-col gap-4"
           onSubmit={(event) => {
@@ -61,9 +66,14 @@ export default function NewNotificationTemplatePage() {
           }}
         >
           {mutation.isError && (
-            <p className="text-sm text-destructive">
-              {mutation.error instanceof Error ? mutation.error.message : "Failed to create template."}
-            </p>
+            <div className="text-sm text-destructive" role="alert" data-testid="save-error">
+              <p>{errorMessage(mutation.error, "Failed to create template.")}</p>
+              {saveIssues.length > 1 && (
+                <ul className="mt-1 list-disc pl-5">
+                  {saveIssues.map((issue) => <li key={issue}>{issue}</li>)}
+                </ul>
+              )}
+            </div>
           )}
           <Combobox
             label="External system"
@@ -109,12 +119,16 @@ export default function NewNotificationTemplatePage() {
             label="Subject"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
-            hint="Optional — used for email templates."
+            required={channel === "email"}
+            hint={channel === "email" ? "Required for email. Variables work here too." : "Not used for this channel."}
           />
           <TextAreaField
             label="Template"
             value={template}
             onChange={(event) => setTemplate(event.target.value)}
+            className="min-h-60 text-xs"
+            spellCheck={false}
+            hint='{{name}} inserts a value (HTML-escaped in email), {{{html}}} inserts raw HTML, {{name | default: "there"}} sets a fallback.'
             required
           />
           <div>
@@ -124,6 +138,13 @@ export default function NewNotificationTemplatePage() {
           </div>
         </form>
       </Card>
+      <TemplatePreview
+        externalSystemId={externalSystemId}
+        channel={channel}
+        template={template}
+        subject={subject || null}
+      />
+      </div>
     </div>
   );
 }

@@ -9,8 +9,10 @@ import type {
   NotificationRecord,
   NotificationRepoError,
   NotificationTemplateConflict,
+  NotificationTemplateInvalid,
   NotificationTemplateNotFound,
   NotificationTemplateRecord,
+  RenderedTemplate,
   PaginatedResult,
   PaginationInput,
 } from "@repo/schema";
@@ -31,6 +33,14 @@ export interface ListNotificationTemplatesInput extends PaginationInput {
 export interface UpdateNotificationTemplate {
   readonly template?: string;
   readonly subject?: string | null;
+}
+
+export interface PreviewNotificationTemplate {
+  readonly external_system_id: string;
+  readonly channel: ChannelType;
+  readonly template: string;
+  readonly subject: string | null;
+  readonly payload: Record<string, unknown>;
 }
 
 // ---------- notifications ----------
@@ -124,7 +134,7 @@ export interface NotificationsService {
     input: AddNotificationTemplate,
   ) => Effect.Effect<
     NotificationTemplateRecord,
-    NotificationRepoError | NotificationTemplateConflict
+    NotificationRepoError | NotificationTemplateConflict | NotificationTemplateInvalid
   >;
 
   readonly getNotificationTemplateById: (
@@ -146,7 +156,22 @@ export interface NotificationsService {
     input: UpdateNotificationTemplate,
   ) => Effect.Effect<
     NotificationTemplateRecord,
-    NotificationRepoError | NotificationTemplateNotFound
+    NotificationRepoError | NotificationTemplateNotFound | NotificationTemplateInvalid
+  >;
+
+  readonly renderNotificationTemplate: (
+    id: string,
+    payload: Record<string, unknown>,
+  ) => Effect.Effect<
+    RenderedTemplate,
+    NotificationRepoError | NotificationTemplateNotFound | NotificationTemplateInvalid
+  >;
+
+  readonly previewNotificationTemplate: (
+    input: PreviewNotificationTemplate,
+  ) => Effect.Effect<
+    RenderedTemplate,
+    NotificationRepoError | NotificationTemplateInvalid
   >;
 
   readonly deleteNotificationTemplate: (

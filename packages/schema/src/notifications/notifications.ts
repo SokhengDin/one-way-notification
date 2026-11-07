@@ -24,9 +24,9 @@ export class NotificationRecord extends Schema.Class<NotificationRecord>(
   event_type: Schema.String,
   payload: Schema.Record(Schema.String, Schema.Unknown),
   idempotency_key: Schema.NullOr(Schema.String),
-  created_at: Schema.String,
-  updated_at: Schema.NullOr(Schema.String),
-  deleted_at: Schema.NullOr(Schema.String),
+  created_at: Schema.Date,
+  updated_at: Schema.NullOr(Schema.Date),
+  deleted_at: Schema.NullOr(Schema.Date),
 }) {}
 
 export class NotificationDeliveryRecord extends Schema.Class<NotificationDeliveryRecord>(
@@ -39,8 +39,21 @@ export class NotificationDeliveryRecord extends Schema.Class<NotificationDeliver
   status: deliveryStatusSchema,
   attempt_count: Schema.Int,
   last_error: Schema.NullOr(Schema.String),
-  sent_at: Schema.NullOr(Schema.String),
+  sent_at: Schema.NullOr(Schema.Date),
   created_at: Schema.Date,
   updated_at: Schema.NullOr(Schema.Date),
   deleted_at: Schema.NullOr(Schema.Date),
+}) {}
+export class RenderedTemplate extends Schema.Class<RenderedTemplate>(
+  "RenderedTemplate"
+)({
+  channel:   channelTypeSchema,
+  subject:   Schema.NullOr(Schema.String),
+  // email: full HTML document; sms/telegram: plain text
+  body:      Schema.String,
+  // email only: text/plain alternative derived from the HTML
+  text:      Schema.NullOr(Schema.String),
+  variables: Schema.Array(Schema.String),
+  missing:   Schema.Array(Schema.String),
+  warnings:  Schema.Array(Schema.String),
 }) {}
