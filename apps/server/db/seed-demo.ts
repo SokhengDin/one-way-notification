@@ -7,6 +7,7 @@
 // Refuses to run twice, and refuses anything that looks like production.
 
 import { SQL } from "bun";
+import { channelsOf, SYSTEMS, type Channel, type EventSpec, type SystemSpec } from "./seed-catalog";
 
 const dbName = process.env.DB_NAME ?? "";
 const dbHost = process.env.DB_HOST ?? "localhost";
@@ -62,14 +63,16 @@ const random = mulberry32(20261107);
 const pick   = <T>(items: ReadonlyArray<T>): T => items[Math.floor(random() * items.length)]!;
 const chance = (p: number) => random() < p;
 const between = (min: number, max: number) => min + Math.floor(random() * (max - min + 1));
+const weighted = <T extends { weight: number }>(items: ReadonlyArray<T>): T => {
+  let roll = random() * items.reduce((sum, item) => sum + item.weight, 0);
+  for (const item of items) {
+    roll -= item.weight;
+    if (roll <= 0) return item;
+  }
+  return items[items.length - 1]!;
+};
 
 // ---------- fixtures ----------
-
-const SYSTEMS = [
-  { name: "Demo Shop",    weight: 0.55, events: ["order.confirmed", "order.delivered", "cart.reminder"] },
-  { name: "Demo Billing", weight: 0.25, events: ["invoice.paid", "invoice.overdue"] },
-  { name: "Demo Auth",    weight: 0.20, events: ["password.reset", "login.alert", "email.verify"] },
-] as const;
 
 const PROVIDERS = [
   { name: "Demo Amazon SES", channel: "email",    kind: "amazon_ses",   priority: 10, config: { region: "eu-west-3", access_key_id: "AKIADEMO", from_email: "noreply@demo.test", from_name: "Demo" } },
@@ -102,6 +105,20 @@ await sql.begin(async (tx) => {
   `;
   const systemId = new Map(systems.map((row: { id: string; name: string }) => [row.name, row.id]));
 
+  // every event's template on every channel it uses
+  const templates = SYSTEMS.flatMap((system) =>
+    system.events.flatMap((spec) =>
+      channelsOf(spec).map((channel) => ({
+        external_system_id: systemId.get(system.name),
+        event_type:         spec.event,
+        channel,
+        subject:            channel === "email" ? spec.email!.subject : null,
+        template:           channel === "email" ? spec.email!.body : channel === "sms" ? spec.sms! : spec.telegram!,
+      })),
+    ),
+  );
+  await tx`INSERT INTO notification_templates ${tx(templates)}`;
+
   const providers = await tx`
     INSERT INTO channel_providers ${tx(PROVIDERS.map((p) => ({ name: p.name, channel: p.channel, kind: p.kind, priority: p.priority, config: p.config })))}
     RETURNING id, name, channel, kind
@@ -114,20 +131,36 @@ await sql.begin(async (tx) => {
     const first = FIRST[i % FIRST.length]!;
     const last  = LAST[(i * 7) % LAST.length]!;
     const slug  = `${first}.${last}`.toLowerCase().normalize("NFD").replace(/[^a-z.]/g, "");
-    return { name: i % 9 === 8 ? null : `${first} ${last}`, email: i % 13 === 12 ? null : `${slug}${i}@example.com`, phone: `+3361234${String(5000 + i)}` };
+    return {
+      first,
+      name:     i % 9 === 8 ? null : `${first} ${last}`,
+      email:    i % 13 === 12 ? null : `${slug}${i}@example.com`,
+      phone:    i % 7 === 6 ? null : `+3361234${String(5000 + i)}`,
+      telegram: i % 3 !== 2 ? String(700000000 + i * 1371) : null,
+    };
   });
   const users: Array<{ id: string }> = await tx`
     INSERT INTO users ${tx(people.map((person) => ({ name: person.name })))} RETURNING id
   `;
   const contacts = people.flatMap((person, i) => [
     ...(person.email ? [{ user_id: users[i]!.id, channel: "email", address: person.email, linked: true, verified: true }] : []),
-    { user_id: users[i]!.id, channel: "sms", address: person.phone, linked: true, verified: true },
+    ...(person.phone ? [{ user_id: users[i]!.id, channel: "sms", address: person.phone, linked: true, verified: true }] : []),
+    ...(person.telegram ? [{ user_id: users[i]!.id, channel: "telegram", address: person.telegram, linked: true, verified: true }] : []),
   ]);
   await tx`INSERT INTO user_contacts ${tx(contacts)}`;
-  const recipientOf = (userId: string, channel: string) => {
-    const person = people[users.findIndex((user) => user.id === userId)]!;
-    return channel === "email" ? person.email : channel === "sms" ? person.phone : "100200300";
+  const personOf    = (userId: string) => people[users.findIndex((user) => user.id === userId)]!;
+  const recipientOf = (userId: string, channel: Channel) => {
+    const person = personOf(userId);
+    return channel === "email" ? person.email : channel === "sms" ? person.phone : person.telegram;
   };
+
+  // each system knows most users under its own id
+  const links = SYSTEMS.flatMap((system, s) =>
+    users
+      .filter((_user, i) => (i + s) % 4 !== 0)
+      .map((user, i) => ({ external_system_id: systemId.get(system.name), external_user_id: `${system.name.split(" ")[1]!.toLowerCase()}-${1000 + i}`, user_id: user.id })),
+  );
+  await tx`INSERT INTO external_user_links ${tx(links)}`;
 
   const notifications: Array<Record<string, unknown>> = [];
   const deliveries:    Array<Record<string, unknown>> = [];
@@ -142,29 +175,37 @@ await sql.begin(async (tx) => {
 
     for (let i = 0; i < volume; i++) {
       const created = new Date(Math.min(now - 60_000, dayStart + Math.floor(random() * DAY)));
-      const r       = random();
-      const system  = r < SYSTEMS[0].weight ? SYSTEMS[0] : r < SYSTEMS[0].weight + SYSTEMS[1].weight ? SYSTEMS[1] : SYSTEMS[2];
-      const notificationId = crypto.randomUUID();
+      const system: SystemSpec = weighted(SYSTEMS);
+      const spec:   EventSpec  = weighted(system.events);
+      const notificationId     = crypto.randomUUID();
 
       const userId = pick(users).id;
       notifications.push({
         id:                 notificationId,
         external_system_id: systemId.get(system.name),
         user_id:            userId,
-        event_type:         pick(system.events),
-        payload:            { demo: true },
+        event_type:         spec.event,
+        payload:            spec.payload({ pick, between, first: personOf(userId).first }),
         created_at:         created,
       });
 
-      const channels = ["email", ...(chance(0.3) ? ["sms"] : []), ...(chance(0.12) ? ["telegram"] : [])];
-      for (const channel of channels) {
+      for (const channel of channelsOf(spec)) {
+        const recipient = recipientOf(userId, channel);
+        if (!recipient) {
+          deliveries.push({
+            id: crypto.randomUUID(), notification_id: notificationId, channel, provider_id: null, recipient: null,
+            status: "skipped", attempt_count: 0, last_error: `User has no ${channel} contact`,
+            sent_at: null, created_at: created, updated_at: created,
+          });
+          continue;
+        }
         const candidates = providersFor(channel);
         const provider   = channel === "email" && candidates.length > 1 && chance(0.3) ? candidates[1] : candidates[0];
         const recent     = now - created.getTime() < 3 * 3_600_000;
         const failP      = incident && channel === "email" ? 0.35 : channel === "sms" ? 0.07 : 0.04;
 
-        const status = recent && chance(0.4) ? pick(["pending", "retrying"]) : chance(failP) ? "failed" : chance(0.03) ? "skipped" : "sent";
-        const attempts = status === "pending" ? 0 : status === "failed" ? between(1, 3) : status === "skipped" ? 0 : chance(0.08) ? 2 : 1;
+        const status = recent && chance(0.4) ? pick(["pending", "retrying"]) : chance(failP) ? "failed" : "sent";
+        const attempts = status === "pending" ? 0 : status === "failed" ? between(1, 3) : chance(0.08) ? 2 : 1;
         const updated  = new Date(created.getTime() + between(1, 90) * 1000);
         const deliveryId = crypto.randomUUID();
 
@@ -172,8 +213,8 @@ await sql.begin(async (tx) => {
           id:              deliveryId,
           notification_id: notificationId,
           channel,
-          provider_id:     status === "skipped" ? null : provider.id,
-          recipient:       recipientOf(userId, channel),
+          provider_id:     provider.id,
+          recipient,
           status,
           attempt_count:   attempts,
           last_error:      status === "failed" ? pick(ERRORS[channel]!) : null,
@@ -203,7 +244,7 @@ await sql.begin(async (tx) => {
   for (let i = 0; i < usage.length; i += 500)         await tx`INSERT INTO provider_usage_log ${tx(usage.slice(i, i + 500))}`;
 
   console.log(
-    `Seeded "${dbName}": ${systems.length} systems, ${providers.length} providers, ${users.length} users, ` +
+    `Seeded "${dbName}": ${systems.length} systems, ${templates.length} templates, ${providers.length} providers, ${users.length} users, ` +
     `${notifications.length} notifications, ${deliveries.length} deliveries, ${usage.length} provider attempts.`,
   );
 });
