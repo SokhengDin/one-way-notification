@@ -29,6 +29,11 @@ export type SendResult =
       readonly ok:         false;
       /** worth trying again later (timeouts, 5xx, rate limits) */
       readonly retryable:  boolean;
+      /**
+       * The problem is this recipient, not the provider (e.g. SMTP "mailbox
+       * busy" at RCPT TO). Doesn't count against the provider's health.
+       */
+      readonly recipientError?: boolean;
       readonly statusCode: number | null;
       readonly error:      string;
       readonly raw:        Record<string, unknown> | null;

@@ -6,20 +6,22 @@ import { useState } from "react";
 import type { ExternalSystemRecord } from "@repo/schema";
 import { LinkButton } from "../../components/button";
 import { DataTable, type DataTableColumn } from "../../components/data-table";
+import { IdChip } from "../../components/id-chip";
 import { PageHeader } from "../../components/page-header";
+import { timeAgo } from "../../lib/format";
 import { listExternalSystems } from "../../lib/api/external-systems";
 
 const columns: ReadonlyArray<DataTableColumn<ExternalSystemRecord>> = [
   {
     header: "Name",
     cell: (row) => (
-      <Link href={`/external-systems/${row.id}`} className="hover:underline">
+      <Link href={`/external-systems/${row.id}`} className="font-medium hover:underline">
         {row.name}
       </Link>
     ),
   },
-  { header: "ID", cell: (row) => <span className="font-mono text-xs">{row.id}</span> },
-  { header: "Created", cell: (row) => new Date(row.created_at).toLocaleString() },
+  { header: "Created", className: "text-muted-foreground", cell: (row) => <span title={new Date(row.created_at).toLocaleString()}>{timeAgo(row.created_at)}</span> },
+  { header: "", className: "text-right", cell: (row) => <IdChip id={row.id} /> },
 ];
 
 export default function ExternalSystemsPage() {

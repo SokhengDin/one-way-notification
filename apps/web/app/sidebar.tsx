@@ -1,21 +1,26 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import {
   Bell,
+  Building2,
   FileStack,
+  Inbox,
   LayoutDashboard,
   Radio,
-  Send,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
+import { getDeliveryQueue } from "../lib/api/deliveries";
+import { useMounted } from "../lib/use-mounted";
 
 interface NavItem {
   readonly label: string;
   readonly href: string;
   readonly icon?: ComponentType<{ className?: string }>;
+  readonly badge?: "queue";
 }
 
 interface NavSection {
@@ -26,26 +31,61 @@ interface NavSection {
 }
 
 const SECTIONS: ReadonlyArray<NavSection> = [
-  { label: "Overview", href: "/", icon: LayoutDashboard },
-  { label: "Users", href: "/users", icon: Users },
   {
-    label: "Notifications",
-    icon: Bell,
+    label: "Monitor",
+    icon: LayoutDashboard,
     items: [
-      { label: "Templates", href: "/notifications/templates", icon: FileStack },
-      { label: "Sent", href: "/notifications", icon: Send },
+      { label: "Overview", href: "/", icon: LayoutDashboard },
+      { label: "Deliveries", href: "/deliveries", icon: Inbox, badge: "queue" },
+      { label: "Notifications", href: "/notifications", icon: Bell },
     ],
   },
-  { label: "External Systems", href: "/external-systems", icon: Radio },
-  { label: "Providers", href: "/providers", icon: Send },
+  {
+    label: "Configure",
+    icon: FileStack,
+    items: [
+      { label: "Templates", href: "/notifications/templates", icon: FileStack },
+      { label: "Providers", href: "/providers", icon: Radio },
+      { label: "External systems", href: "/external-systems", icon: Building2 },
+      { label: "Users", href: "/users", icon: Users },
+    ],
+  },
 ];
+
+/** Failed deliveries in the last hour, or what's waiting to go out. */
+function QueueBadge() {
+  const query = useQuery({
+    queryKey:        ["delivery-queue"],
+    queryFn:         getDeliveryQueue,
+    refetchInterval: 15_000,
+  });
+  const mounted = useMounted();
+  const queue   = mounted ? query.data?.data : undefined;
+  if (!queue) return null;
+  if (queue.failed_last_hour > 0) {
+    return (
+      <span className="ml-auto rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white tabular-nums" title="Failed in the last hour">
+        {queue.failed_last_hour}
+      </span>
+    );
+  }
+  const waiting = queue.pending + queue.retrying;
+  if (waiting === 0) return null;
+  return (
+    <span className="ml-auto rounded-full bg-sidebar-accent px-1.5 text-[11px] text-sidebar-foreground/80 tabular-nums" title="Queued or retrying">
+      {waiting}
+    </span>
+  );
+}
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
+  // /notifications/templates is its own item, not part of "Notifications"
+  if (href === "/notifications" && pathname.startsWith("/notifications/templates")) return false;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLink({ label, href, icon: Icon }: NavItem) {
+function NavLink({ label, href, icon: Icon, badge }: NavItem) {
   const pathname = usePathname();
   const active = isActive(pathname, href);
 
@@ -60,6 +100,7 @@ function NavLink({ label, href, icon: Icon }: NavItem) {
     >
       {Icon && <Icon className="size-4 shrink-0" />}
       {label}
+      {badge === "queue" && <QueueBadge />}
     </Link>
   );
 }
@@ -80,14 +121,11 @@ export function Sidebar() {
               <NavLink label={section.label} href={section.href} icon={section.icon} />
             ) : (
               <>
-                <div className="flex items-center gap-2.5 px-3 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/40">
-                  {section.icon && <section.icon className="size-3.5" />}
+                <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
                   {section.label}
                 </div>
                 {section.items?.map((item) => (
-                  <div key={item.href} className="pl-4">
-                    <NavLink label={item.label} href={item.href} icon={item.icon} />
-                  </div>
+                  <NavLink key={item.href} {...item} />
                 ))}
               </>
             )}

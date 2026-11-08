@@ -44,7 +44,16 @@ export const deleteNotificationTemplate = (id: string) =>
 
 // ---------- notifications ----------
 
-export const listNotifications = (query: { skip?: number; limit?: number }) =>
+export type NotificationOutcome = "failed" | "active" | "sent";
+
+export const listNotifications = (query: {
+  skip?: number;
+  limit?: number;
+  external_system_id?: string;
+  user_id?: string;
+  event_type?: string;
+  outcome?: NotificationOutcome;
+}) =>
   runApi((client) => client.notifications.listNotifications({ query }));
 
 export const addNotification = (payload: {
@@ -53,6 +62,7 @@ export const addNotification = (payload: {
   event_type: string;
   payload: Record<string, unknown>;
   idempotency_key?: string | null;
+  channels?: ReadonlyArray<ChannelType>;
 }) => runApi((client) => client.notifications.addNotification({ payload }));
 
 export const getNotificationById = (id: string) =>

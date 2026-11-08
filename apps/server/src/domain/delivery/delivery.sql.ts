@@ -219,14 +219,16 @@ export function makeSqlDeliveryRepo(sql: SqlClient): DeliveryRepoService {
               SET consecutive_failures = 0, last_success_at = now(), cooldown_until = NULL
               WHERE id = ${input.provider_id}
             `;
-          } else {
+          } else if (input.trips_breaker) {
+            // only provider-side trouble counts against its health; a bad
+            // recipient address says nothing about the provider
             yield* sql`
               UPDATE channel_providers
               SET consecutive_failures = consecutive_failures + 1,
                   last_failure_at      = now(),
                   last_error           = ${input.error},
                   cooldown_until       = CASE
-                    WHEN ${input.trips_breaker}::boolean AND consecutive_failures + 1 >= ${BREAKER_THRESHOLD}::int
+                    WHEN consecutive_failures + 1 >= ${BREAKER_THRESHOLD}::int
                       THEN now() + make_interval(secs => LEAST(
                         ${BREAKER_BASE_S}::int * power(2, LEAST(consecutive_failures + 1 - ${BREAKER_THRESHOLD}::int, 10)),
                         ${BREAKER_MAX_S}::int))

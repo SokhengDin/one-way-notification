@@ -231,10 +231,29 @@ planned file API plugs in as another `AssetSource` there.
 ## Current domain status
 
 - `users` — complete: repo/service/handler layers, full CRUD +
-  contacts/preferences, Swagger-documented.
-- `notifications` — templates (CRUD, validation, render/preview),
-  notifications and deliveries endpoints. Nothing sends yet: there is no
-  delivery worker, and providers are configured but not called.
+  contacts/preferences, Swagger-documented. Users have an optional `name`;
+  every API shape that refers to a user carries `display_name` from the
+  `user_labels` view (name → email contact → linked external id → short id).
+  The dashboard never shows a raw UUID as a label — use names, with
+  `IdChip` for the rare copy-the-id case.
+- `notifications` — templates (CRUD, validation, render/preview).
+  `POST /notification` plans one delivery per channel that has a template
+  (skipped, with the reason, when the user turned the channel off or has no
+  contact), in one transaction; 422 for unknown users or events with no
+  template. Idempotency keys are scoped per external system.
+- `delivery` — the pipeline. `delivery.worker.ts` runs inside the API
+  process (`DELIVERY_WORKER_ENABLED`, safe in several replicas): it claims due
+  deliveries with `FOR UPDATE SKIP LOCKED` plus a lease (`locked_until`),
+  renders at send time, tries active providers of the channel in priority
+  order (healthy ones first), and retries with backoff (`backoff.ts`) up to
+  `max_attempts`. At-least-once: a crash mid-send means the lease expires and
+  it is sent again. Every provider call goes in `provider_usage_log`.
+  Provider adapters live in `delivery/senders/` as plain async functions
+  behind the `SenderRegistry` service, which tests replace with a scripted
+  fake (`test/support.ts` → `fakeSenders`). Provider health / circuit
+  breaker: 3 provider-side failures in a row → cooldown (30 s doubling, max
+  15 min); recipient errors don't count. Operator API: list/filter, detail
+  with attempts, retry, cancel, bulk retry, queue stats, process-now.
 - `providers` — configuration with encrypted credentials (see above).
 - `stats` — overview statistics (see above).
 - `assets` — complete (see above).

@@ -525,6 +525,47 @@ test.describe("overview dashboard", () => {
   });
 });
 
+test.describe("names instead of ids", () => {
+  test("a user is created with a name and shown by it everywhere", async ({ page }) => {
+    const name = `Dara E2E ${Date.now()}`;
+    await page.goto("/users/new");
+    await page.getByLabel("Name", { exact: true }).fill(name);
+    await page.getByRole("button", { name: "Create user" }).click();
+    await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
+
+    await page.goto("/users");
+    await page.getByLabel("Search users").fill(name);
+    await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible();
+  });
+
+  test("lists show user and system names, not UUIDs", async ({ page }) => {
+    const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+    for (const path of ["/notifications", "/deliveries", "/users", "/notifications/templates", "/external-systems"]) {
+      await page.goto(path);
+      await page.waitForLoadState("networkidle");
+      expect(await page.locator("main table").innerText(), path).not.toMatch(uuid);
+    }
+  });
+});
+
+test.describe("deliveries", () => {
+  test("queue tiles, status filter and a delivery's timeline", async ({ page }) => {
+    await page.goto("/deliveries");
+    await expect(page.getByText("Sent, last hour")).toBeVisible();
+
+    await page.getByRole("radio", { name: "Failed" }).click();
+    await expect(page).toHaveURL(/status=failed/);
+    const firstRow = page.locator("main table tbody tr").first();
+    await expect(firstRow).toContainText("Failed");
+
+    await firstRow.getByRole("link").first().click();
+    await expect(page).toHaveURL(/\/deliveries\/[0-9a-f-]{36}$/);
+    await expect(page.getByText("Timeline")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  });
+});
+
 test("no console errors on the main screens", async ({ page }) => {
   const errors: Array<string> = [];
   page.on("console", (message) => {
@@ -532,7 +573,10 @@ test("no console errors on the main screens", async ({ page }) => {
   });
   page.on("pageerror", (error) => errors.push(error.message));
 
-  for (const path of ["/", systemPath, "/notifications/templates", "/notifications/templates/new", "/providers", "/providers/new"]) {
+  for (const path of [
+    "/", systemPath, "/notifications/templates", "/notifications/templates/new", "/providers", "/providers/new",
+    "/deliveries", "/notifications", "/notifications/new", "/users",
+  ]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
   }

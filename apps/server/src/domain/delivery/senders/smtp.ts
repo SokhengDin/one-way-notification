@@ -5,6 +5,7 @@ import { formatSender, str, type Sender } from "./types";
 
 interface SmtpError {
   readonly code?:         string;
+  readonly command?:      string;
   readonly responseCode?: number;
   readonly response?:     string;
   readonly message?:      string;
@@ -47,6 +48,7 @@ export const smtp: Sender = async ({ config, secrets }, message, { signal }) => 
         retryable:  false,
         statusCode: null,
         error:      `Recipient rejected: ${rejected.join(", ")}`,
+        recipientError: true,
         raw:        { response: info.response, rejected },
       };
     }
@@ -68,9 +70,11 @@ export const smtp: Sender = async ({ config, secrets }, message, { signal }) => 
       ? "Timed out waiting for the SMTP server"
       : (error.response ?? error.message ?? String(cause));
     return {
-      ok:         false,
+      ok:             false,
       retryable,
-      statusCode: code,
+      // rejected at RCPT TO: about this address, not the server
+      recipientError: error.command?.toUpperCase().startsWith("RCPT") ?? false,
+      statusCode:     code,
       error:      (error.code === "EAUTH" ? `Authentication failed: ${text}` : text).slice(0, 1000),
       raw:        { code: error.code ?? null, response: error.response ?? null },
     };

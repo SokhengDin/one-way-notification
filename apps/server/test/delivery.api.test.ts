@@ -206,7 +206,7 @@ describe("sending", () => {
     await processQueue();
     const delivery = await onlyDelivery(n.id);
     expect(delivery.status).toBe("failed");
-    expect(delivery.last_error).toContain("was deleted");
+    expect(delivery.last_error).toContain("it was deleted");
     expect(fakeSenders.sent).toHaveLength(0);
   });
 
@@ -260,7 +260,22 @@ describe("circuit breaker", () => {
     expect(reset).toMatchObject({ consecutive_failures: 0, cooldown_until: null });
   });
 
-  test("recipient errors don't trip the breaker", async () => {
+  test("a transient recipient problem (mailbox busy) retries without hurting the provider", async () => {
+    const { system, user } = await setup();
+    const provider = await createProvider();
+    fakeSenders.respond(provider.id, () => ({
+      ok: false, retryable: true, recipientError: true, statusCode: 451, error: "Mailbox busy", raw: null,
+    }));
+    for (let i = 0; i < 4; i++) {
+      await notify(system.id, user.id);
+      await processQueue();
+    }
+    expect((await api("GET", "/api/delivery?status=retrying")).json.data.total).toBe(4);
+    const health = (await api("GET", `/api/channel-provider/${provider.id}`)).json.data;
+    expect(health).toMatchObject({ consecutive_failures: 0, cooldown_until: null });
+  });
+
+  test("recipient errors don't count against the provider", async () => {
     const { system, user } = await setup();
     const provider = await createProvider();
     fakeSenders.respond(provider.id, fail("invalid address", false));
@@ -269,7 +284,7 @@ describe("circuit breaker", () => {
       await processQueue();
     }
     const health = (await api("GET", `/api/channel-provider/${provider.id}`)).json.data;
-    expect(health.consecutive_failures).toBe(4);
+    expect(health.consecutive_failures).toBe(0);
     expect(health.cooldown_until).toBeNull();
   });
 });

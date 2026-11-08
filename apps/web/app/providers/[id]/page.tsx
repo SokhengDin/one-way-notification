@@ -9,6 +9,7 @@ import { Card } from "../../../components/card";
 import { ConfirmButton } from "../../../components/confirm-button";
 import { PageHeader } from "../../../components/page-header";
 import { ProviderForm, providerFormFrom } from "../../../components/provider-form";
+import { ProviderHealthCard } from "../../../components/provider-health";
 import { ChannelBadge } from "../../../components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deleteChannelProvider, getChannelProviderById, updateChannelProvider } from "../../../lib/api/providers";
@@ -96,6 +97,8 @@ export default function ProviderDetailPage() {
           <Skeleton className="h-64 w-full" />
         </div>
       ) : (
+        <div className="flex flex-col gap-6">
+        <ProviderHealthCard provider={provider} />
         <ProviderForm
           // remount on save so the form reflects what the server stored
           key={provider.updated_at?.toString() ?? provider.id}
@@ -110,6 +113,7 @@ export default function ProviderDetailPage() {
           submitLabel="Save"
           onSubmit={(submit) => updateMutation.mutate(submit)}
         />
+        </div>
       )}
     </div>
   );

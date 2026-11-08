@@ -77,7 +77,7 @@ describe("SMTP", () => {
 
   test("5xx is permanent, 4xx is retryable", async () => {
     expect(await send(creds(), "x@rejected.test")).toMatchObject({ ok: false, retryable: false, statusCode: 550 });
-    expect(await send(creds(), "x@busy.test")).toMatchObject({ ok: false, retryable: true, statusCode: 451 });
+    expect(await send(creds(), "x@busy.test")).toMatchObject({ ok: false, retryable: true, statusCode: 451, recipientError: true });
   });
 
   test("bad credentials are reported as an authentication failure", async () => {
@@ -88,6 +88,6 @@ describe("SMTP", () => {
 
   test("an unreachable server is retryable", async () => {
     const result = await send(creds({ port: 1 }), "dara@example.com");
-    expect(result).toMatchObject({ ok: false, retryable: true });
+    expect(result).toMatchObject({ ok: false, retryable: true, recipientError: false });
   });
 });

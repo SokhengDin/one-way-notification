@@ -9,15 +9,28 @@ const STATUS_CLASSES: Record<DeliveryStatus, string> = {
   failed: "bg-destructive/15 text-destructive dark:bg-destructive/20",
   retrying: "bg-warning/20 text-warning-foreground dark:bg-warning/25",
   skipped: "bg-secondary text-secondary-foreground",
+  cancelled: "bg-secondary text-muted-foreground line-through decoration-1",
 };
 
-export function StatusBadge({ status }: { status: DeliveryStatus }) {
+const STATUS_LABELS: Record<DeliveryStatus, string> = {
+  pending: "Queued",
+  sent: "Sent",
+  failed: "Failed",
+  retrying: "Retrying",
+  skipped: "Skipped",
+  cancelled: "Cancelled",
+};
+
+export function StatusBadge({ status, inFlight = false }: { status: DeliveryStatus; inFlight?: boolean }) {
   return (
-    <Badge variant="outline" className={cn("border-transparent capitalize", STATUS_CLASSES[status])}>
-      {status}
+    <Badge variant="outline" className={cn("gap-1.5 border-transparent", STATUS_CLASSES[status])}>
+      {inFlight && <span className="size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
+      {inFlight ? "Sending" : STATUS_LABELS[status]}
     </Badge>
   );
 }
+
+export const statusLabel = (status: DeliveryStatus) => STATUS_LABELS[status];
 
 const CHANNEL_ICONS: Record<ChannelType, React.ComponentType<{ className?: string }>> = {
   email: Mail,

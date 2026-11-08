@@ -82,7 +82,7 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
         if (claim.template_id === null) {
           return {
             _tag: "Failed", providerId: null,
-            error: `The ${claim.channel} template for "${claim.event_type}" was deleted`,
+            error: `No ${claim.channel} template for "${claim.event_type}" any more (it was deleted)`,
           } satisfies DeliveryOutcome;
         }
 
@@ -153,7 +153,8 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
             duration_ms:     result.durationMs,
             // a bad recipient isn't the provider's fault; timeouts, 5xx and
             // rejected credentials are
-            trips_breaker:   !result.ok && (result.retryable || result.statusCode === 401 || result.statusCode === 403),
+            trips_breaker:   !result.ok && !result.recipientError &&
+                             (result.retryable || result.statusCode === 401 || result.statusCode === 403),
           });
 
           if (result.ok) {

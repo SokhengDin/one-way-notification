@@ -44,6 +44,16 @@ export const deleteChannelProvider = (id: string) =>
     client.providers.deleteChannelProvider({ params: { id } }),
   );
 
+export const testChannelProvider = (id: string, payload: { to: string; message?: string }) =>
+  runApi((client) =>
+    client.providers.testChannelProvider({ params: { id }, payload }),
+  );
+
+export const resetChannelProviderHealth = (id: string) =>
+  runApi((client) =>
+    client.providers.resetChannelProviderHealth({ params: { id } }),
+  );
+
 // ---------- provider_usage_log ----------
 
 export const listProviderUsageLogByDelivery = (
