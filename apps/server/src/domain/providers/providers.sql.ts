@@ -21,7 +21,9 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
   // ---------- channel_providers ----------
 
   const COLUMNS = sql.literal(
-    "id, channel, name, is_active, kind, config, secret_keys, priority, created_at, updated_at, deleted_at",
+    "id, channel, name, is_active, kind, config, secret_keys, priority, " +
+      "consecutive_failures, last_success_at, last_failure_at, last_error, cooldown_until, " +
+      "created_at, updated_at, deleted_at",
   );
 
   // A unique-name violation is the one constraint the repo reports as a
@@ -146,6 +148,19 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
       return rows.length > 0;
     });
 
+  const resetChannelProviderHealth: ProviderRepoService["resetChannelProviderHealth"] =
+    Effect.fn("ProvidersRepo.resetChannelProviderHealth")(function* (id) {
+      const rows = yield* sql<ChannelProviderRecord>`
+        UPDATE channel_providers
+        SET consecutive_failures = 0, cooldown_until = NULL, updated_at = now()
+        WHERE id = ${id} AND deleted_at IS NULL
+        RETURNING ${COLUMNS}
+      `.pipe(mapSqlError("resetChannelProviderHealth"));
+
+      const row = rows[0];
+      return row ? new ChannelProviderRecord(row) : null;
+    });
+
   // ---------- provider_usage_log ----------
 
   const addProviderUsageLog: ProviderRepoService["addProviderUsageLog"] =
@@ -192,6 +207,7 @@ export function makeSqlProvidersRepo(sql: SqlClient): ProviderRepoService {
     listChannelProviders,
     updateChannelProvider,
     deleteChannelProvider,
+    resetChannelProviderHealth,
     addProviderUsageLog,
     listProviderUsageLogByDelivery,
   };

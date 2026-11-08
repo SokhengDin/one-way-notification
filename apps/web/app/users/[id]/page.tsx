@@ -7,7 +7,7 @@ import { useState } from "react";
 import { CHANNEL_TYPES, type ChannelType, type UserContactRecord, type UserPreferenceRecord } from "@repo/schema";
 import { Button, LinkButton } from "../../../components/button";
 import { Card } from "../../../components/card";
-import { CheckboxField, SelectField } from "../../../components/form-field";
+import { CheckboxField, SelectField, TextField } from "../../../components/form-field";
 import { DataTable, type DataTableColumn } from "../../../components/data-table";
 import { PageHeader } from "../../../components/page-header";
 import { BooleanBadge, ChannelBadge } from "../../../components/status-badge";
@@ -19,8 +19,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { toast } from "sonner";
+import { ConfirmButton } from "../../../components/confirm-button";
+import { SystemLink } from "../../../components/entity-links";
+import { IdChip } from "../../../components/id-chip";
+import { OutcomeSummary } from "../../../components/notification-outcome";
 import { listExternalUserLinksByUser } from "../../../lib/api/external-systems";
-import { deleteUser, getUserById, listUserContacts, listUserPreferences, setUserPreference } from "../../../lib/api/users";
+import { listNotifications } from "../../../lib/api/notifications";
+import { deleteUser, getUserById, listUserContacts, listUserPreferences, setUserPreference, updateUser } from "../../../lib/api/users";
+import { errorMessage } from "../../../lib/errors";
+import { timeAgo } from "../../../lib/format";
 
 const contactColumns: ReadonlyArray<DataTableColumn<UserContactRecord>> = [
   { header: "Channel", cell: (row) => <ChannelBadge channel={row.channel} /> },
@@ -79,6 +87,24 @@ export default function UserDetailPage() {
     onSuccess: () => router.push("/users"),
   });
 
+  const notificationsQuery = useQuery({
+    queryKey: ["notifications", { user_id: userId, limit: 10 }],
+    queryFn:  () => listNotifications({ user_id: userId, skip: 0, limit: 10 }),
+  });
+
+  const user = userQuery.data?.data;
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const renameMutation = useMutation({
+    mutationFn: () => updateUser(userId, { name: (nameDraft ?? "").trim() || null }),
+    onSuccess: () => {
+      toast.success("Name saved");
+      setNameDraft(null);
+      void queryClient.invalidateQueries({ queryKey: ["user", userId] });
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (error) => toast.error(errorMessage(error, "Could not save the name")),
+  });
+
   const preferenceByChannel = new Map(
     (preferencesQuery.data?.data.items ?? []).map((preference) => [preference.channel, preference]),
   );
@@ -86,14 +112,46 @@ export default function UserDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={userQuery.data ? `User ${userQuery.data.data.id}` : "User"}
-        description={userQuery.data ? `Created ${new Date(userQuery.data.data.created_at).toLocaleString()}` : undefined}
+        title={user ? user.display_name : "User"}
+        description={user ? `${user.email ?? "No email"} · created ${timeAgo(user.created_at)}` : undefined}
         actions={
-          <Button variant="danger" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
-            {deleteMutation.isPending ? "Deleting…" : "Delete user"}
-          </Button>
+          <ConfirmButton
+            label="Delete user"
+            title={`Delete ${user?.display_name ?? "this user"}?`}
+            description="Their contacts and links go with them. Past notifications stay in the history."
+            isPending={deleteMutation.isPending}
+            onConfirm={() => deleteMutation.mutate()}
+          />
         }
       />
+
+      {user && (
+        <Card title="Profile">
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              renameMutation.mutate();
+            }}
+          >
+            <div className="w-72">
+              <TextField
+                label="Name"
+                value={nameDraft ?? user.name ?? ""}
+                onChange={(event) => setNameDraft(event.target.value)}
+                placeholder="Not set"
+                hint={user.name ? undefined : `Shown as "${user.display_name}" until a name is set.`}
+              />
+            </div>
+            <Button type="submit" variant="secondary" disabled={nameDraft === null || renameMutation.isPending}>
+              {renameMutation.isPending ? "Saving…" : "Save name"}
+            </Button>
+            <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+              <IdChip id={user.id} label="Id" />
+            </div>
+          </form>
+        </Card>
+      )}
 
       <Card
         title="Contacts"
@@ -146,7 +204,7 @@ export default function UserDetailPage() {
                 label="Channel"
                 value={preferenceChannel}
                 onValueChange={(value) => setPreferenceChannel(value as ChannelType)}
-                options={CHANNEL_TYPES.map((channel) => ({ value: channel, label: channel }))}
+                options={CHANNEL_TYPES.map((channel) => ({ value: channel, label: { email: "Email", sms: "SMS", telegram: "Telegram" }[channel] }))}
               />
             </div>
             <CheckboxField label="Enabled" checked={preferenceEnabled} onCheckedChange={setPreferenceEnabled} />
@@ -166,19 +224,41 @@ export default function UserDetailPage() {
           columns={[
             {
               header: "External system",
-              cell: (row) => (
-                <Link href={`/external-systems/${row.external_system_id}`} className="hover:underline">
-                  {row.external_system_id}
-                </Link>
-              ),
+              cell: (row) => <SystemLink id={row.external_system_id} name={row.system_name} />,
             },
-            { header: "External user id", cell: (row) => row.external_user_id },
+            { header: "Known there as", cell: (row) => <span className="font-mono text-xs">{row.external_user_id}</span> },
           ]}
           data={linksQuery.data?.data}
           rowKey={(row) => row.id}
           isLoading={linksQuery.isLoading}
           error={linksQuery.error}
           emptyMessage="No linked external systems."
+        />
+      </Card>
+
+      <Card
+        title="Recent notifications"
+        actions={<LinkButton variant="outline" href={`/deliveries?q=${encodeURIComponent(user?.display_name ?? "")}`}>All deliveries</LinkButton>}
+      >
+        <DataTable
+          columns={[
+            {
+              header: "Event",
+              cell: (row) => <Link href={`/notifications/${row.id}`} className="font-medium hover:underline">{row.event_type}</Link>,
+            },
+            { header: "System", cell: (row) => <SystemLink id={row.external_system_id} name={row.system_name} /> },
+            { header: "Outcome", cell: (row) => <OutcomeSummary row={row} /> },
+            {
+              header: "When",
+              className: "whitespace-nowrap text-muted-foreground",
+              cell: (row) => <span title={new Date(row.created_at).toLocaleString()}>{timeAgo(row.created_at)}</span>,
+            },
+          ]}
+          data={notificationsQuery.data?.data}
+          rowKey={(row) => row.id}
+          isLoading={notificationsQuery.isLoading}
+          error={notificationsQuery.error}
+          emptyMessage="Nothing sent to this user yet."
         />
       </Card>
     </div>

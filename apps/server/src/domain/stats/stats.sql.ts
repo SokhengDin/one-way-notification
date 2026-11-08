@@ -56,7 +56,7 @@ export function makeSqlStatsRepo(sql: SqlClient): StatsRepoService {
           count(*)        FILTER (WHERE d.created_at >= ${from} AND d.status = 'failed')              AS failed,
           count(*)        FILTER (WHERE d.created_at >= ${from} AND d.status = 'pending')             AS pending,
           count(*)        FILTER (WHERE d.created_at >= ${from} AND d.status = 'retrying')            AS retrying,
-          count(*)        FILTER (WHERE d.created_at >= ${from} AND d.status = 'skipped')             AS skipped,
+          count(*)        FILTER (WHERE d.created_at >= ${from} AND d.status IN ('skipped', 'cancelled'))             AS skipped,
           avg(d.attempt_count) FILTER (WHERE d.created_at >= ${from} AND d.status IN ('sent', 'failed')) AS avg_attempts,
           count(*)        FILTER (WHERE d.created_at < ${from})                                       AS prev_deliveries,
           count(*)        FILTER (WHERE d.created_at < ${from} AND d.status = 'sent')                 AS prev_sent,
@@ -90,7 +90,7 @@ export function makeSqlStatsRepo(sql: SqlClient): StatsRepoService {
                  count(*) FILTER (WHERE status = 'sent')                     AS sent,
                  count(*) FILTER (WHERE status = 'failed')                   AS failed,
                  count(*) FILTER (WHERE status IN ('pending', 'retrying'))   AS in_progress,
-                 count(*) FILTER (WHERE status = 'skipped')                  AS skipped
+                 count(*) FILTER (WHERE status IN ('skipped', 'cancelled'))                  AS skipped
           FROM notification_deliveries
           WHERE deleted_at IS NULL AND created_at >= ${from} AND created_at <= ${to}
           GROUP BY 1
@@ -109,7 +109,7 @@ export function makeSqlStatsRepo(sql: SqlClient): StatsRepoService {
                count(d.id) FILTER (WHERE d.status = 'sent')                  AS sent,
                count(d.id) FILTER (WHERE d.status = 'failed')                AS failed,
                count(d.id) FILTER (WHERE d.status IN ('pending', 'retrying')) AS in_progress,
-               count(d.id) FILTER (WHERE d.status = 'skipped')               AS skipped
+               count(d.id) FILTER (WHERE d.status IN ('skipped', 'cancelled'))               AS skipped
         FROM unnest(enum_range(NULL::channel_type)) AS c(channel)
         LEFT JOIN notification_deliveries d
                ON d.channel = c.channel AND d.deleted_at IS NULL

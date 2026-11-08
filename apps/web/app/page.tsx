@@ -360,7 +360,10 @@ function ProvidersCard({ stats }: { readonly stats: StatsOverview }) {
 
 function FailuresCard({ stats }: { readonly stats: StatsOverview }) {
   return (
-    <Card title="Recent failures">
+    <Card
+      title="Recent failures"
+      actions={<Link href="/deliveries?status=failed" className="text-sm text-primary hover:underline">All failed deliveries</Link>}
+    >
       {stats.recent_failures.length === 0 ? (
         <p className="flex items-center justify-center gap-1.5 py-6 text-sm text-muted-foreground">
           <Check className="size-4" style={{ color: "var(--viz-sent)" }} aria-hidden="true" />
@@ -384,7 +387,7 @@ function FailuresCard({ stats }: { readonly stats: StatsOverview }) {
                 <tr key={failure.delivery_id} className="border-t align-top">
                   <td className="whitespace-nowrap py-2 pr-3 text-xs">{new Date(failure.failed_at).toLocaleString()}</td>
                   <td className="py-2 pr-3">
-                    <Link href={`/notifications/${failure.notification_id}`} className="font-medium hover:underline">
+                    <Link href={`/deliveries/${failure.delivery_id}`} className="font-medium hover:underline">
                       {failure.event_type}
                     </Link>
                     <div className="text-xs text-muted-foreground">{failure.system_name}</div>

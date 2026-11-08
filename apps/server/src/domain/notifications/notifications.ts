@@ -4,6 +4,7 @@ import {
   NotificationRepoError,
   NotificationTemplateInvalid,
   NotificationTemplateNotFound,
+  NotificationUndeliverable,
   RenderedTemplate,
   type ChannelType,
 } from "@repo/schema";
@@ -183,7 +184,25 @@ export class Notifications extends Context.Service<
 
       const addNotification: NotificationsService["addNotification"] =
         Effect.fn("Notifications.addNotification")(function* (input) {
-          return yield* repo.addNotification(input);
+          const result = yield* repo.addNotification({
+            ...input,
+            max_attempts: config.delivery.maxAttempts,
+          });
+          switch (result._tag) {
+            case "Created":
+            case "Replayed":
+              return result.notification;
+            case "UnknownUser":
+              return yield* new NotificationUndeliverable({
+                message: `user_id: no user with id ${input.user_id}`,
+              });
+            case "NoTemplates": {
+              const scope = input.channels && input.channels.length > 0 ? ` on ${input.channels.join(", ")}` : "";
+              return yield* new NotificationUndeliverable({
+                message: `event_type: this system has no template for "${input.event_type}"${scope}, so nothing could be sent. Create one first.`,
+              });
+            }
+          }
         });
 
       const getNotificationById: NotificationsService["getNotificationById"] =

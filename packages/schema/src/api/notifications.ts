@@ -5,6 +5,7 @@ import { channelTypeSchema, deliveryStatusSchema } from "../enums";
 import {
   NotificationDeliveryRecord,
   NotificationRecord,
+  NotificationSummary,
   NotificationTemplateRecord,
   RenderedTemplate,
 } from "../notifications/notifications";
@@ -16,6 +17,7 @@ import {
   NotificationTemplateConflict,
   NotificationTemplateInvalid,
   NotificationTemplateNotFound,
+  NotificationUndeliverable,
 } from "../notifications/notifications.errors";
 import { PaginatedData, PaginationQuery } from "../shared/pagination";
 import { ApiResponse } from "./response";
@@ -86,8 +88,16 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
 
     // ---------- notifications ----------
     HttpApiEndpoint.get("listNotifications", "/notification", {
-      query: PaginationQuery,
-      success: ApiResponse(PaginatedData(NotificationRecord)),
+      query: {
+        ...PaginationQuery,
+        external_system_id: Schema.optional(Uuid),
+        user_id: Schema.optional(Uuid),
+        event_type: Schema.optional(Schema.String),
+        // "failed": at least one delivery failed; "active": still sending;
+        // "sent": every delivery that could go out did
+        outcome: Schema.optional(Schema.Literals(["failed", "active", "sent"])),
+      },
+      success: ApiResponse(PaginatedData(NotificationSummary)),
       error: NotificationRepoError,
     }),
     HttpApiEndpoint.post("addNotification", "/notification", {
@@ -97,13 +107,15 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
         event_type: Schema.String,
         payload: Schema.Record(Schema.String, Schema.Unknown),
         idempotency_key: Schema.optional(Schema.NullOr(Schema.String)),
+        // limit to these channels; default: every channel with a template
+        channels: Schema.optional(Schema.Array(channelTypeSchema)),
       }),
       success: ApiResponse(NotificationRecord),
-      error: [NotificationConflict, NotificationRepoError],
+      error: [NotificationConflict, NotificationUndeliverable, NotificationRepoError],
     }),
     HttpApiEndpoint.get("getNotificationById", "/notification/:id", {
       params: { id: Uuid },
-      success: ApiResponse(NotificationRecord),
+      success: ApiResponse(NotificationSummary),
       error: [NotificationNotFound, NotificationRepoError],
     }),
 

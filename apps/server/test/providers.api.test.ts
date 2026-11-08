@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { ConfigProvider, Effect, Layer } from "effect";
 import { PgLive } from "../src/pg";
+import { SenderRegistry } from "../src/domain/delivery/senders";
 import { Providers } from "../src/domain/providers/providers";
 import { decryptSecrets, deriveKey, encryptSecrets } from "../src/domain/providers/provider-secrets";
 import { api, resetDb, testSql } from "./support";
@@ -37,7 +38,7 @@ const resolve = (id: string) =>
     Effect.gen(function* () {
       const providers = yield* Providers;
       return yield* providers.resolveProviderCredentials(id);
-    }).pipe(Effect.provide(Providers.layer.pipe(Layer.provide(PgLive)))),
+    }).pipe(Effect.provide(Providers.layer.pipe(Layer.provide(SenderRegistry.live), Layer.provide(PgLive)))),
   );
 
 describe("create", () => {
@@ -263,6 +264,7 @@ describe("without PROVIDER_SECRET_KEY", () => {
   // stops Effect reusing an instance memoized by an earlier test.
   const { PROVIDER_SECRET_KEY: _omitted, ...envWithoutKey } = process.env;
   const ServiceWithoutKey = Providers.layer.pipe(
+    Layer.provide(SenderRegistry.live),
     Layer.provide(PgLive),
     Layer.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: envWithoutKey as Record<string, string> }))),
   );

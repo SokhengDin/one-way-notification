@@ -10,6 +10,7 @@ import type {
   ProviderInvalid,
   ProviderRepoError,
   ProviderSecretsUnavailable,
+  ProviderTestResult,
   ProviderUsageLogRecord,
 } from "@repo/schema";
 
@@ -70,7 +71,7 @@ export interface ProviderWithSecrets {
   readonly secrets: Uint8Array | null;
 }
 
-/** Decrypted settings for whatever actually sends (the future delivery worker). */
+/** Decrypted settings for whatever actually sends (the delivery worker and provider tests). */
 export interface ProviderCredentials {
   readonly id:      string;
   readonly channel: ChannelType;
@@ -131,6 +132,10 @@ export interface ProviderRepoService {
     id: string,
   ) => Effect.Effect<boolean, ProviderRepoError>;
 
+  readonly resetChannelProviderHealth: (
+    id: string,
+  ) => Effect.Effect<ChannelProviderRecord | null, ProviderRepoError>;
+
   // provider_usage_log
   readonly addProviderUsageLog: (
     input: AddProviderUsageLog,
@@ -187,6 +192,19 @@ export interface ProvidersService {
   readonly deleteChannelProvider: (
     id: string,
   ) => Effect.Effect<void, ProviderRepoError | ChannelProviderNotFound>;
+
+  readonly resetChannelProviderHealth: (
+    id: string,
+  ) => Effect.Effect<ChannelProviderRecord, ProviderRepoError | ChannelProviderNotFound>;
+
+  /** Send one message through this provider right now, outside the queue. */
+  readonly testChannelProvider: (
+    id: string,
+    input: { readonly to: string; readonly message?: string },
+  ) => Effect.Effect<
+    ProviderTestResult,
+    ProviderRepoError | ChannelProviderNotFound | ProviderInvalid | ProviderSecretsUnavailable
+  >;
 
   /** Decrypted config + credentials. Not exposed over HTTP. */
   readonly resolveProviderCredentials: (

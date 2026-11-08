@@ -14,6 +14,12 @@
     "@effect/sql-pg": "^4.0.0-beta.102",
     "@repo/schema": "workspace:*",
     "effect": "^4.0.0-beta.102",
+    "nodemailer": "^10.4.0",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
+    "@types/smtp-server": "^3.5.13",
+    "smtp-server": "^3.21.3"
   }
 }

@@ -19,13 +19,29 @@ import { ApiResponse } from "./response";
 export class UsersApiGroup extends HttpApiGroup.make("users")
   .add(
     HttpApiEndpoint.get("listUsers", "/", {
-      query: PaginationQuery,
+      query: {
+        ...PaginationQuery,
+        // matches name, email or linked external user id (case-insensitive)
+        q: Schema.optional(Schema.String),
+      },
       success: ApiResponse(PaginatedData(UserRecord)),
       error: UserRepoError,
     }),
     HttpApiEndpoint.post("addUser", "/", {
+      payload: Schema.Struct({
+        name: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
       success: ApiResponse(UserRecord),
       error: UserRepoError,
+    }),
+    HttpApiEndpoint.patch("updateUser", "/:id", {
+      params: { id: Uuid },
+      payload: Schema.Struct({
+        // null or "" clears it
+        name: Schema.optional(Schema.NullOr(Schema.String)),
+      }),
+      success: ApiResponse(UserRecord),
+      error: [UserNotFound, UserRepoError],
     }),
     HttpApiEndpoint.get("getUserById", "/:id", {
       params: { id: Uuid },

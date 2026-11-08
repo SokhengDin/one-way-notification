@@ -9,6 +9,7 @@ import { LinkButton } from "../../components/button";
 import { DataTable, type DataTableColumn } from "../../components/data-table";
 import { PageHeader } from "../../components/page-header";
 import { BooleanBadge, ChannelBadge } from "../../components/status-badge";
+import { HealthBadge } from "../../components/provider-health";
 import { listChannelProviders } from "../../lib/api/providers";
 
 function sender(provider: ChannelProviderRecord): string {
@@ -45,6 +46,7 @@ const columns: ReadonlyArray<DataTableColumn<ChannelProviderRecord>> = [
   { header: "Sends from",  cell: (row) => <span className="text-xs">{sender(row)}</span> },
   { header: "Priority",    cell: (row) => <span className="tabular-nums">{row.priority}</span> },
   { header: "Credentials", cell: (row) => <CredentialsBadge provider={row} /> },
+  { header: "Health",      cell: (row) => <HealthBadge provider={row} /> },
   { header: "Active",      cell: (row) => <BooleanBadge value={row.is_active ?? true} /> },
 ];
 
@@ -54,13 +56,14 @@ export default function ProvidersPage() {
   const query = useQuery({
     queryKey: ["channel-providers", pagination],
     queryFn:  () => listChannelProviders(pagination),
+    refetchInterval: 15_000,
   });
 
   return (
     <div>
       <PageHeader
         title="Providers"
-        description="Where notifications are sent through, per channel. Lower priority is tried first."
+        description="Where notifications are sent through. Per channel, the lowest priority is tried first and the next one takes over if it fails."
         actions={<LinkButton href="/providers/new">New provider</LinkButton>}
       />
       <DataTable

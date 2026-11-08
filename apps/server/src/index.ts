@@ -1,7 +1,7 @@
 import { BunHttpServer, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer, Logger } from "effect";
 import { HttpRouter } from "effect/unstable/http";
-import { AppRoutes, corsMiddleware } from "./app";
+import { AppRoutes, corsMiddleware, WorkerLive } from "./app";
 import { AppConfigLive, AppConfigService } from "./config/config";
 
 const LoggerLive = Logger.layer([
@@ -33,4 +33,4 @@ const HttpServerLive = ServedRoutesLive.pipe(
   Layer.provide(LoggerLive),
 );
 
-BunRuntime.runMain(Layer.launch(HttpServerLive));
+BunRuntime.runMain(Layer.launch(Layer.mergeAll(HttpServerLive, WorkerLive.pipe(Layer.provide(LoggerLive)))));

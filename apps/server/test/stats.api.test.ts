@@ -154,13 +154,14 @@ describe("time window", () => {
   test("daily rows split sent, failed, in-progress and skipped", async () => {
     const s = await system("shop");
     const u = await user();
-    const n = await notification(s, u, "e");
-    for (const status of ["sent", "sent", "failed", "pending", "retrying", "skipped"]) {
-      await delivery(n, { status });
+    // one delivery per channel per notification, so one notification each
+    for (const status of ["sent", "sent", "failed", "pending", "retrying", "skipped", "cancelled"]) {
+      await delivery(await notification(s, u, "e"), { status });
     }
     const today = (await overview("?days=1")).daily;
     expect(today).toHaveLength(1);
-    expect(today[0]).toMatchObject({ notifications: 1, sent: 2, failed: 1, in_progress: 2, skipped: 1 });
+    // cancelled counts with skipped: neither was attempted
+    expect(today[0]).toMatchObject({ notifications: 7, sent: 2, failed: 1, in_progress: 2, skipped: 2 });
   });
 });
 

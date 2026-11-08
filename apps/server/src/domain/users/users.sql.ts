@@ -18,25 +18,34 @@ const { toRepoError: toUserRepoError, mapSqlError } = makeMapSqlError<
 >((fields) => new UserRepoError(fields), "Failed to query users");
 
 export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
+  // Users always come back with their readable label, from the
+  // `user_labels` view (name → email → external id → short id).
+  const selectUser = (id: string) => sql<UserRecord>`
+    SELECT u.id, l.name, l.email, l.display_name, u.created_at, u.updated_at, u.deleted_at
+    FROM users u
+    JOIN user_labels l ON l.id = u.id
+    WHERE u.id = ${id} AND u.deleted_at IS NULL
+  `;
+
+  const cleanName = (name: string | null | undefined) =>
+    name === undefined ? undefined : name === null || name.trim() === "" ? null : name.trim();
+
   const addUser: UserRepoService["addUser"] = Effect.fn(
     "UsersRepo.addUser",
-  )(function* (_input) {
-    const rows = yield* sql<UserRecord>`
-      INSERT INTO users DEFAULT VALUES
-      RETURNING id, created_at, updated_at, deleted_at
+  )(function* (input) {
+    const inserted = yield* sql<{ id: string }>`
+      INSERT INTO users (name) VALUES (${cleanName(input.name) ?? null})
+      RETURNING id
     `.pipe(mapSqlError("addUser"));
 
+    const rows = yield* selectUser(inserted[0]!.id).pipe(mapSqlError("addUser"));
     return new UserRecord(rows[0]!);
   });
 
   const findUserById: UserRepoService["findUserById"] = Effect.fn(
     "UsersRepo.findUserById",
   )(function* (id) {
-    const rows = yield* sql<UserRecord>`
-      SELECT id, created_at, updated_at, deleted_at
-      FROM users
-      WHERE id = ${id} AND deleted_at IS NULL
-    `.pipe(mapSqlError("getUserById"));
+    const rows = yield* selectUser(id).pipe(mapSqlError("getUserById"));
 
     const row = rows[0];
     return row ? new UserRecord(row) : null;
@@ -46,13 +55,18 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     "UsersRepo.listUsers",
   )(function* (input) {
     const { skip, limit } = normalizePagination(input);
+    const q       = input.q?.trim() ?? "";
+    const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
     const rows = yield* sql<UserRecord & { readonly total_count: number }>`
-      SELECT id, created_at, updated_at, deleted_at,
+      SELECT u.id, l.name, l.email, l.display_name, u.created_at, u.updated_at, u.deleted_at,
              COUNT(*) OVER()::int AS total_count
-      FROM users
-      WHERE deleted_at IS NULL
-      ORDER BY created_at DESC
+      FROM users u
+      JOIN user_labels l ON l.id = u.id
+      WHERE u.deleted_at IS NULL
+        AND (${q} = '' OR l.display_name ILIKE ${pattern} OR l.email ILIKE ${pattern}
+             OR l.external_user_id ILIKE ${pattern} OR u.id::text = ${q})
+      ORDER BY u.created_at DESC
       LIMIT ${limit} OFFSET ${skip}
     `.pipe(mapSqlError("listUsers"));
 
@@ -62,6 +76,23 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       skip,
       limit,
     };
+  });
+
+  const updateUser: UserRepoService["updateUser"] = Effect.fn(
+    "UsersRepo.updateUser",
+  )(function* (id, input) {
+    const name = cleanName(input.name);
+    const updated = yield* sql<{ id: string }>`
+      UPDATE users
+      SET name       = CASE WHEN ${name !== undefined} THEN ${name ?? null} ELSE name END,
+          updated_at = now()
+      WHERE id = ${id} AND deleted_at IS NULL
+      RETURNING id
+    `.pipe(mapSqlError("updateUser"));
+    if (updated.length === 0) return null;
+
+    const rows = yield* selectUser(id).pipe(mapSqlError("updateUser"));
+    return rows[0] ? new UserRecord(rows[0]) : null;
   });
 
   const deleteUser: UserRepoService["deleteUser"] = Effect.fn(
@@ -194,6 +225,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     addUser,
     findUserById,
     listUsers,
+    updateUser,
     deleteUser,
     listUserContacts,
     findUserContact,

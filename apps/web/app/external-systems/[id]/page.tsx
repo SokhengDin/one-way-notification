@@ -1,7 +1,6 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ExternalUserLinkRecord } from "@repo/schema";
@@ -12,6 +11,8 @@ import { Card } from "../../../components/card";
 import { TextField } from "../../../components/form-field";
 import { DataTable, type DataTableColumn } from "../../../components/data-table";
 import { PageHeader } from "../../../components/page-header";
+import { UserLink } from "../../../components/entity-links";
+import { UserPicker } from "../../../components/pickers";
 import {
   addExternalUserLink,
   deleteExternalSystem,
@@ -21,15 +22,8 @@ import {
 } from "../../../lib/api/external-systems";
 
 const linkColumns: ReadonlyArray<DataTableColumn<ExternalUserLinkRecord>> = [
-  {
-    header: "User",
-    cell: (row) => (
-      <Link href={`/users/${row.user_id}`} className="font-mono text-xs hover:underline">
-        {row.user_id}
-      </Link>
-    ),
-  },
-  { header: "External user id", cell: (row) => row.external_user_id },
+  { header: "User", cell: (row) => <UserLink id={row.user_id} name={row.user_display_name} /> },
+  { header: "Known here as", cell: (row) => <span className="font-mono text-xs">{row.external_user_id}</span> },
 ];
 
 export default function ExternalSystemDetailPage() {
@@ -157,18 +151,13 @@ export default function ExternalSystemDetailPage() {
             </p>
           )}
           <div className="flex-1">
-            <TextField
-              label="External user id"
-              value={externalUserId}
-              onChange={(event) => setExternalUserId(event.target.value)}
-              required
-            />
+            <UserPicker value={userId} onChange={(id) => setUserId(id)} />
           </div>
           <div className="flex-1">
             <TextField
-              label="User id"
-              value={userId}
-              onChange={(event) => setUserId(event.target.value)}
+              label="Their id in this system"
+              value={externalUserId}
+              onChange={(event) => setExternalUserId(event.target.value)}
               required
             />
           </div>

@@ -95,7 +95,8 @@ export function SelectField({
   const fieldId = id ?? label;
   return (
     <FieldWrapper label={label} htmlFor={fieldId} error={error} hint={hint}>
-      <Select value={value} onValueChange={(next) => onValueChange(next as string)}>
+      {/* items lets the trigger show the option's label, not its raw value */}
+      <Select items={options.map((option) => ({ value: option.value, label: option.label }))} value={value} onValueChange={(next) => onValueChange(next as string)}>
         <SelectTrigger id={fieldId} className={`w-full ${className ?? ""}`}>
           <SelectValue />
         </SelectTrigger>

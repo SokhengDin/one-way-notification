@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Api } from "@repo/schema";
 import { OpenApi } from "effect/unstable/httpapi";
-import { api, createSystem, createUser, resetDb } from "./support";
+import { api, createSystem, createTemplate, createUser, resetDb } from "./support";
 
 const NIL_UUID = "00000000-0000-4000-8000-000000000000";
 const isIsoDate = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value));
@@ -88,7 +88,8 @@ describe("external systems", () => {
 describe("notifications", () => {
   test("create with a JSON payload, get and list", async () => {
     const system  = await createSystem();
-    const user    = await createUser();
+    const user    = await createUser("Dara");
+    await createTemplate({ external_system_id: system.id, event_type: "order.shipped" });
     const payload = { order: { id: 7, items: ["a", "b"] }, flag: true };
     const created = await api("POST", "/api/notification", {
       external_system_id: system.id, user_id: user.id, event_type: "order.shipped", payload,
@@ -97,15 +98,23 @@ describe("notifications", () => {
     expect(created.json.data.payload).toEqual(payload);
     expect(isIsoDate(created.json.data.created_at)).toBe(true);
 
-    const id = created.json.data.id;
-    expect((await api("GET", `/api/notification/${id}`)).json.data.payload).toEqual(payload);
+    const id      = created.json.data.id;
+    const fetched = (await api("GET", `/api/notification/${id}`)).json.data;
+    expect(fetched.payload).toEqual(payload);
+    // names, not just ids
+    expect(fetched.user_display_name).toBe("Dara");
+    expect(fetched.system_name).toBe(system.name);
     expect((await api("GET", "/api/notification")).json.data.total).toBe(1);
-    expect((await api("GET", `/api/notification/${id}/delivery`)).json.data.items).toEqual([]);
+    // the user has no email contact, so the one delivery is skipped with the reason
+    const deliveries = (await api("GET", `/api/notification/${id}/delivery`)).json.data.items;
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]).toMatchObject({ channel: "email", status: "skipped", last_error: "User has no email contact" });
   });
 
   test("idempotency key returns the original notification", async () => {
     const system = await createSystem();
     const user   = await createUser();
+    await createTemplate({ external_system_id: system.id, event_type: "e" });
     const body   = {
       external_system_id: system.id, user_id: user.id, event_type: "e", payload: { n: 1 }, idempotency_key: "k-1",
     };
@@ -115,6 +124,41 @@ describe("notifications", () => {
     expect(second.json.data.id).toBe(first.json.data.id);
     expect(second.json.data.payload).toEqual({ n: 1 });
     expect((await api("GET", "/api/notification")).json.data.total).toBe(1);
+    // replays don't plan more deliveries
+    expect((await api("GET", `/api/notification/${first.json.data.id}/delivery`)).json.data.total).toBe(1);
+  });
+
+  test("idempotency keys are scoped per external system", async () => {
+    const [a, b] = [await createSystem(), await createSystem()];
+    const user   = await createUser();
+    await createTemplate({ external_system_id: a.id, event_type: "e" });
+    await createTemplate({ external_system_id: b.id, event_type: "e" });
+    const send = (system: string) =>
+      api("POST", "/api/notification", { external_system_id: system, user_id: user.id, event_type: "e", payload: {}, idempotency_key: "same" });
+    const first  = await send(a.id);
+    const second = await send(b.id);
+    expect(second.status).toBe(200);
+    expect(second.json.data.id).not.toBe(first.json.data.id);
+  });
+
+  test("no template for the event → 422, nothing stored", async () => {
+    const system = await createSystem();
+    const user   = await createUser();
+    const res    = await api("POST", "/api/notification", {
+      external_system_id: system.id, user_id: user.id, event_type: "nobody.listens", payload: {},
+    });
+    expect(res.status).toBe(422);
+    expect(res.json.message ?? JSON.stringify(res.json)).toContain("nobody.listens");
+    expect((await api("GET", "/api/notification")).json.data.total).toBe(0);
+  });
+
+  test("unknown user → 422 instead of a database error", async () => {
+    const system = await createSystem();
+    await createTemplate({ external_system_id: system.id, event_type: "e" });
+    const res = await api("POST", "/api/notification", {
+      external_system_id: system.id, user_id: crypto.randomUUID(), event_type: "e", payload: {},
+    });
+    expect(res.status).toBe(422);
   });
 
   test("malformed ids → 400", async () => {

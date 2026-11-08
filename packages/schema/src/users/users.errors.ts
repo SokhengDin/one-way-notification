@@ -4,6 +4,7 @@ export const UserRepoOperation = Schema.Literals([
   "addUser",
   "getUserById",
   "listUsers",
+  "updateUser",
   "deleteUser",
   "listUserContacts",
   "getUserContact",

@@ -18,6 +18,9 @@ export class ExternalUserLinkRecord extends Schema.Class<ExternalUserLinkRecord>
   external_system_id: Schema.String,
   external_user_id: Schema.String,
   user_id: Schema.String,
+  // readable labels for the dashboard
+  system_name: Schema.String,
+  user_display_name: Schema.String,
   created_at: Schema.Date,
   updated_at: Schema.NullOr(Schema.Date),
   deleted_at: Schema.NullOr(Schema.Date),

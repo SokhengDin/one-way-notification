@@ -7,6 +7,7 @@ export const ProviderRepoOperation = Schema.Literals([
   "listChannelProviders",
   "updateChannelProvider",
   "deleteChannelProvider",
+  "resetChannelProviderHealth",
   // provider_usage_log
   "addProviderUsageLog",
   "listProviderUsageLogByDelivery",

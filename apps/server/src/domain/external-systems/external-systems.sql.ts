@@ -129,9 +129,16 @@ export function makeSqlExternalSystemsRepo(
   const addExternalUserLink: ExternalSystemRepoService["addExternalUserLink"] =
     Effect.fn("ExternalSystemsRepo.addExternalUserLink")(function* (input) {
       const rows = yield* sql<ExternalUserLinkRecord>`
-        INSERT INTO external_user_links (external_system_id, external_user_id, user_id)
-        VALUES (${input.external_system_id}, ${input.external_user_id}, ${input.user_id})
-        RETURNING id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at
+        WITH inserted AS (
+          INSERT INTO external_user_links (external_system_id, external_user_id, user_id)
+          VALUES (${input.external_system_id}, ${input.external_user_id}, ${input.user_id})
+          RETURNING id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at
+        )
+        SELECT i.*, s.name AS system_name,
+               COALESCE(NULLIF(btrim(u.name), ''), i.external_user_id) AS user_display_name
+        FROM inserted i
+        JOIN external_systems s ON s.id = i.external_system_id
+        JOIN users u            ON u.id = i.user_id
       `.pipe(
         Effect.catchReason(
           "SqlError",
@@ -160,11 +167,14 @@ export function makeSqlExternalSystemsRepo(
       const rows = yield* sql<
         ExternalUserLinkRecord & { readonly total_count: number }
       >`
-        SELECT id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at,
+        SELECT l.id, l.external_system_id, l.external_user_id, l.user_id, l.created_at, l.updated_at, l.deleted_at,
+               s.name AS system_name, ul.display_name AS user_display_name,
                COUNT(*) OVER()::int AS total_count
-        FROM external_user_links
-        WHERE user_id = ${userId} AND deleted_at IS NULL
-        ORDER BY created_at DESC
+        FROM external_user_links l
+        JOIN external_systems s ON s.id = l.external_system_id
+        JOIN user_labels ul     ON ul.id = l.user_id
+        WHERE l.user_id = ${userId} AND l.deleted_at IS NULL
+        ORDER BY l.created_at DESC
         LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listExternalUserLinksByUser"));
 
@@ -186,11 +196,14 @@ export function makeSqlExternalSystemsRepo(
       const rows = yield* sql<
         ExternalUserLinkRecord & { readonly total_count: number }
       >`
-        SELECT id, external_system_id, external_user_id, user_id, created_at, updated_at, deleted_at,
+        SELECT l.id, l.external_system_id, l.external_user_id, l.user_id, l.created_at, l.updated_at, l.deleted_at,
+               s.name AS system_name, ul.display_name AS user_display_name,
                COUNT(*) OVER()::int AS total_count
-        FROM external_user_links
-        WHERE external_system_id = ${externalSystemId} AND deleted_at IS NULL
-        ORDER BY created_at DESC
+        FROM external_user_links l
+        JOIN external_systems s ON s.id = l.external_system_id
+        JOIN user_labels ul     ON ul.id = l.user_id
+        WHERE l.external_system_id = ${externalSystemId} AND l.deleted_at IS NULL
+        ORDER BY l.created_at DESC
         LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listExternalUserLinksBySystem"));
 

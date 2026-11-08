@@ -5,6 +5,7 @@ import {
   normalizePagination,
   NotificationRecord,
   NotificationRepoError,
+  NotificationSummary,
   NotificationTemplateConflict,
   NotificationTemplateRecord,
   type NotificationRepoOperation,
@@ -12,6 +13,16 @@ import {
 import { Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
 import type { NotificationRepoService } from "./notifications.types";
+
+/** pg returns text[] as an array, or as "{a,b}" through some drivers. */
+export function parsePgArray(value: unknown): ReadonlyArray<string> {
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === "string" && value.startsWith("{") && value.endsWith("}")) {
+    const inner = value.slice(1, -1);
+    return inner === "" ? [] : inner.split(",");
+  }
+  return [];
+}
 
 const { toRepoError: toNotificationRepoError, mapSqlError } = makeMapSqlError<
   NotificationRepoOperation,
@@ -126,75 +137,191 @@ export function makeSqlNotificationRepo(
 
   // ---------- notifications ----------
 
+  const NOTIFICATION_COLUMNS = sql.literal(
+    "id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at",
+  );
+
+  const findByIdempotencyKey = (externalSystemId: string, key: string) =>
+    sql<NotificationRecord>`
+      SELECT ${NOTIFICATION_COLUMNS}
+      FROM notifications
+      WHERE external_system_id = ${externalSystemId} AND idempotency_key = ${key}
+    `.pipe(mapSqlError("addNotification"));
+
   const addNotification: NotificationRepoService["addNotification"] =
     Effect.fn("NotificationsRepo.addNotification")(function* (input) {
-      const rows = yield* sql<NotificationRecord>`
-        INSERT INTO notifications (external_system_id, user_id, event_type, payload, idempotency_key)
-        VALUES (${input.external_system_id}, ${input.user_id}, ${input.event_type}, ${input.payload}, ${input.idempotency_key ?? null})
-        ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
-        RETURNING id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
-      `.pipe(mapSqlError("addNotification"));
+      const key = input.idempotency_key ?? null;
 
-      if (rows[0]) {
-        return new NotificationRecord(rows[0]);
-      }
+      const insert = Effect.gen(function* () {
+        // replay of an already-accepted request: return it, plan nothing new
+        if (key !== null) {
+          const existing = yield* findByIdempotencyKey(input.external_system_id, key);
+          if (existing[0]) {
+            return { _tag: "Replayed", notification: new NotificationRecord(existing[0]) } as const;
+          }
+        }
 
-      // Insert hit the idempotency conflict (DO NOTHING returned no row) —
-      // this is a replay of an already-processed request, so return the
-      // existing notification instead of erroring.
-      const existing = yield* sql<NotificationRecord>`
-        SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
-        FROM notifications
-        WHERE idempotency_key = ${input.idempotency_key ?? null}
-      `.pipe(mapSqlError("addNotification"));
+        const users = yield* sql<{ id: string }>`
+          SELECT id FROM users WHERE id = ${input.user_id} AND deleted_at IS NULL
+        `.pipe(mapSqlError("planDeliveries"));
+        if (users.length === 0) return { _tag: "UnknownUser" } as const;
 
-      if (!existing[0]) {
-        return yield* Effect.fail(
-          new NotificationConflict({
-            message: `A notification with idempotency key "${input.idempotency_key}" could not be created or found`,
-          }),
-        );
-      }
+        // "" = every channel
+        const channels = (input.channels ?? []).join(",");
+        const templates = yield* sql<{ channel: string }>`
+          SELECT channel::text AS channel
+          FROM notification_templates
+          WHERE external_system_id = ${input.external_system_id}
+            AND event_type = ${input.event_type}
+            AND deleted_at IS NULL
+            AND (${channels} = '' OR channel::text = ANY(string_to_array(${channels}, ',')))
+        `.pipe(mapSqlError("planDeliveries"));
+        if (templates.length === 0) return { _tag: "NoTemplates" } as const;
 
-      return new NotificationRecord(existing[0]);
+        const rows = yield* sql<NotificationRecord>`
+          INSERT INTO notifications (external_system_id, user_id, event_type, payload, idempotency_key)
+          VALUES (${input.external_system_id}, ${input.user_id}, ${input.event_type}, ${input.payload}, ${key})
+          ON CONFLICT (external_system_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+          RETURNING ${NOTIFICATION_COLUMNS}
+        `.pipe(mapSqlError("addNotification"));
+
+        if (!rows[0]) {
+          // lost a race with a concurrent request carrying the same key
+          const existing = yield* findByIdempotencyKey(input.external_system_id, key ?? "");
+          if (!existing[0]) {
+            return yield* Effect.fail(
+              new NotificationConflict({
+                message: `A notification with idempotency key "${key}" could not be created or found`,
+              }),
+            );
+          }
+          return { _tag: "Replayed", notification: new NotificationRecord(existing[0]) } as const;
+        }
+
+        const notification = new NotificationRecord(rows[0]);
+
+        // One delivery per channel that has a template. Channels the user
+        // turned off, or has no usable contact for, are recorded as skipped
+        // with the reason, so the dashboard can explain why nothing went out.
+        yield* sql`
+          INSERT INTO notification_deliveries
+            (notification_id, channel, status, recipient, last_error, max_attempts)
+          SELECT ${notification.id}, t.channel,
+                 CASE
+                   WHEN p.enabled = FALSE THEN 'skipped'
+                   WHEN c.id IS NULL OR c.address IS NULL OR btrim(c.address) = '' THEN 'skipped'
+                   WHEN t.channel = 'telegram' AND NOT c.linked THEN 'skipped'
+                   ELSE 'pending'
+                 END::delivery_status,
+                 c.address,
+                 CASE
+                   WHEN p.enabled = FALSE THEN 'User turned off ' || t.channel::text || ' notifications'
+                   WHEN c.id IS NULL OR c.address IS NULL OR btrim(c.address) = '' THEN 'User has no ' || t.channel::text || ' contact'
+                   WHEN t.channel = 'telegram' AND NOT c.linked THEN 'User has not linked Telegram'
+                   ELSE NULL
+                 END,
+                 ${input.max_attempts}
+          FROM notification_templates t
+          LEFT JOIN user_contacts c
+                 ON c.user_id = ${input.user_id} AND c.channel = t.channel AND c.deleted_at IS NULL
+          LEFT JOIN user_preferences p
+                 ON p.user_id = ${input.user_id} AND p.channel = t.channel
+          WHERE t.external_system_id = ${input.external_system_id}
+            AND t.event_type = ${input.event_type}
+            AND t.deleted_at IS NULL
+            AND (${channels} = '' OR t.channel::text = ANY(string_to_array(${channels}, ',')))
+          ON CONFLICT DO NOTHING
+        `.pipe(mapSqlError("planDeliveries"));
+
+        return { _tag: "Created", notification } as const;
+      });
+
+      return yield* sql.withTransaction(insert).pipe(
+        Effect.catchTag("SqlError", (error) => Effect.fail(toNotificationRepoError("addNotification", error))),
+      );
+    });
+
+  // A notification with names and a roll-up of its deliveries.
+  const SUMMARY_SELECT = sql.literal(`
+    SELECT n.id, n.external_system_id, s.name AS system_name,
+           n.user_id, ul.display_name AS user_display_name,
+           n.event_type, n.payload, n.idempotency_key, n.created_at,
+           COALESCE(d.total, 0)   AS deliveries_total,
+           COALESCE(d.sent, 0)    AS deliveries_sent,
+           COALESCE(d.failed, 0)  AS deliveries_failed,
+           COALESCE(d.active, 0)  AS deliveries_active,
+           COALESCE(d.skipped, 0) AS deliveries_skipped,
+           COALESCE(d.channels, '{}') AS channels
+    FROM notifications n
+    JOIN external_systems s ON s.id = n.external_system_id
+    JOIN user_labels ul     ON ul.id = n.user_id
+    LEFT JOIN LATERAL (
+      SELECT count(*)::int                                                   AS total,
+             count(*) FILTER (WHERE status = 'sent')::int                    AS sent,
+             count(*) FILTER (WHERE status = 'failed')::int                  AS failed,
+             count(*) FILTER (WHERE status IN ('pending', 'retrying'))::int  AS active,
+             count(*) FILTER (WHERE status IN ('skipped', 'cancelled'))::int AS skipped,
+             array_agg(channel::text ORDER BY channel)                       AS channels
+      FROM notification_deliveries
+      WHERE notification_id = n.id AND deleted_at IS NULL
+    ) d ON TRUE
+  `);
+
+  const toSummary = (row: Record<string, unknown>) =>
+    new NotificationSummary({
+      ...(row as unknown as NotificationSummary),
+      channels: parsePgArray(row.channels) as NotificationSummary["channels"],
     });
 
   const findNotificationById: NotificationRepoService["findNotificationById"] =
     Effect.fn("NotificationsRepo.findNotificationById")(function* (id) {
-      const rows = yield* sql<NotificationRecord>`
-        SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at
-        FROM notifications
-        WHERE id = ${id} AND deleted_at IS NULL
+      const rows = yield* sql<Record<string, unknown>>`
+        ${SUMMARY_SELECT}
+        WHERE n.id = ${id} AND n.deleted_at IS NULL
       `.pipe(mapSqlError("findNotificationById"));
 
       const row = rows[0];
-      return row ? new NotificationRecord(row) : null;
+      return row ? toSummary(row) : null;
     });
 
   const listNotifications: NotificationRepoService["listNotifications"] =
     Effect.fn("NotificationsRepo.listNotifications")(function* (input) {
       const { skip, limit } = normalizePagination(input);
+      const systemId  = input.external_system_id ?? null;
+      const userId    = input.user_id ?? null;
+      const eventType = input.event_type?.trim() || null;
+      const outcome   = input.outcome ?? null;
 
-      const rows = yield* sql<
-        NotificationRecord & { readonly total_count: number }
-      >`
-        SELECT id, external_system_id, user_id, event_type, payload, idempotency_key, created_at, updated_at, deleted_at,
-               COUNT(*) OVER()::int AS total_count
-        FROM notifications
-        WHERE deleted_at IS NULL
-        ORDER BY created_at DESC
+      const rows = yield* sql<Record<string, unknown>>`
+        SELECT *, COUNT(*) OVER()::int AS total_count FROM (
+          ${SUMMARY_SELECT}
+          WHERE n.deleted_at IS NULL
+            AND (${systemId}::uuid IS NULL OR n.external_system_id = ${systemId}::uuid)
+            AND (${userId}::uuid   IS NULL OR n.user_id = ${userId}::uuid)
+            AND (${eventType}::text IS NULL OR n.event_type = ${eventType}::text)
+        ) x
+        WHERE ${outcome}::text IS NULL
+           OR (${outcome}::text = 'failed' AND x.deliveries_failed > 0)
+           OR (${outcome}::text = 'active' AND x.deliveries_active > 0)
+           OR (${outcome}::text = 'sent'   AND x.deliveries_sent > 0 AND x.deliveries_failed = 0 AND x.deliveries_active = 0)
+        ORDER BY x.created_at DESC, x.id
         LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listNotifications"));
 
       return {
-        items: rows.map((row) => new NotificationRecord(row)),
-        total: rows[0]?.total_count ?? 0,
+        items: rows.map(toSummary),
+        total: Number(rows[0]?.total_count ?? 0),
         skip,
         limit,
       };
     });
 
   // ---------- notification_deliveries ----------
+
+  const DELIVERY_COLUMNS = sql.literal(
+    "id, notification_id, channel, provider_id, status, attempt_count, max_attempts, recipient, " +
+      "last_error, next_attempt_at, sent_at, created_at, updated_at, deleted_at",
+  );
 
   const listNotificationDeliveries: NotificationRepoService["listNotificationDeliveries"] =
     Effect.fn("NotificationsRepo.listNotificationDeliveries")(function* (
@@ -206,7 +333,7 @@ export function makeSqlNotificationRepo(
       const rows = yield* sql<
         NotificationDeliveryRecord & { readonly total_count: number }
       >`
-        SELECT id, notification_id, channel, provider_id, status, attempt_count, last_error, sent_at, created_at, updated_at, deleted_at,
+        SELECT ${DELIVERY_COLUMNS},
                COUNT(*) OVER()::int AS total_count
         FROM notification_deliveries
         WHERE notification_id = ${notificationId} AND deleted_at IS NULL
@@ -234,7 +361,7 @@ export function makeSqlNotificationRepo(
             attempt_count = attempt_count + 1,
             updated_at = now()
           WHERE id = ${id} AND deleted_at IS NULL
-          RETURNING id, notification_id, channel, provider_id, status, attempt_count, last_error, sent_at, created_at, updated_at, deleted_at
+          RETURNING ${DELIVERY_COLUMNS}
         `.pipe(mapSqlError("updateNotificationDeliveryStatus"));
 
         const row = rows[0];

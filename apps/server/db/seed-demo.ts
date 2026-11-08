@@ -3,7 +3,7 @@
 //
 //   bun run seed:demo            (from the repo root)
 //
-// Writes directly with SQL (deliveries have no create endpoint yet). Refuses
+// Writes directly with SQL (faster than going through the API, and it can backdate). Refuses
 // databases whose name doesn't look disposable, and refuses to run twice.
 
 import { SQL } from "bun";
@@ -67,6 +67,9 @@ const ERRORS: Record<string, ReadonlyArray<string>> = {
   telegram: ["403: Forbidden: bot was blocked by the user", "400: Bad Request: chat not found"],
 };
 
+const FIRST = ["Dara", "Sophea", "Vanna", "Chanthy", "Rithy", "Sokha", "Bopha", "Visal", "Malis", "Piseth", "Camille", "Lucas", "Chloé", "Hugo", "Léa", "Nathan", "Inès", "Louis", "Manon", "Jules"];
+const LAST  = ["Sok", "Chan", "Kim", "Lim", "Heng", "Martin", "Bernard", "Dubois", "Moreau", "Laurent"];
+
 const COST: Record<string, number> = { amazon_ses: 0.0001, smtp: 0, twilio: 0.0079, telegram_bot: 0 };
 
 // ---------- seed ----------
@@ -88,11 +91,26 @@ await sql.begin(async (tx) => {
   `;
   const providersFor = (channel: string) => providers.filter((p: { channel: string }) => p.channel === channel);
 
-  // users have no columns to fill, so there's no bulk VALUES form
-  const users: Array<{ id: string }> = [];
-  for (let i = 0; i < 40; i++) {
-    users.push(...(await tx`INSERT INTO users DEFAULT VALUES RETURNING id`));
-  }
+  // most users have a name and an email; a few only an email or nothing,
+  // so the dashboard's display-name fallbacks show up too
+  const people = Array.from({ length: 40 }, (_, i) => {
+    const first = FIRST[i % FIRST.length]!;
+    const last  = LAST[(i * 7) % LAST.length]!;
+    const slug  = `${first}.${last}`.toLowerCase().normalize("NFD").replace(/[^a-z.]/g, "");
+    return { name: i % 9 === 8 ? null : `${first} ${last}`, email: i % 13 === 12 ? null : `${slug}${i}@example.com`, phone: `+3361234${String(5000 + i)}` };
+  });
+  const users: Array<{ id: string }> = await tx`
+    INSERT INTO users ${tx(people.map((person) => ({ name: person.name })))} RETURNING id
+  `;
+  const contacts = people.flatMap((person, i) => [
+    ...(person.email ? [{ user_id: users[i]!.id, channel: "email", address: person.email, linked: true, verified: true }] : []),
+    { user_id: users[i]!.id, channel: "sms", address: person.phone, linked: true, verified: true },
+  ]);
+  await tx`INSERT INTO user_contacts ${tx(contacts)}`;
+  const recipientOf = (userId: string, channel: string) => {
+    const person = people[users.findIndex((user) => user.id === userId)]!;
+    return channel === "email" ? person.email : channel === "sms" ? person.phone : "100200300";
+  };
 
   const notifications: Array<Record<string, unknown>> = [];
   const deliveries:    Array<Record<string, unknown>> = [];
@@ -111,10 +129,11 @@ await sql.begin(async (tx) => {
       const system  = r < SYSTEMS[0].weight ? SYSTEMS[0] : r < SYSTEMS[0].weight + SYSTEMS[1].weight ? SYSTEMS[1] : SYSTEMS[2];
       const notificationId = crypto.randomUUID();
 
+      const userId = pick(users).id;
       notifications.push({
         id:                 notificationId,
         external_system_id: systemId.get(system.name),
-        user_id:            pick(users).id,
+        user_id:            userId,
         event_type:         pick(system.events),
         payload:            { demo: true },
         created_at:         created,
@@ -137,6 +156,7 @@ await sql.begin(async (tx) => {
           notification_id: notificationId,
           channel,
           provider_id:     status === "skipped" ? null : provider.id,
+          recipient:       recipientOf(userId, channel),
           status,
           attempt_count:   attempts,
           last_error:      status === "failed" ? pick(ERRORS[channel]!) : null,
@@ -150,6 +170,9 @@ await sql.begin(async (tx) => {
             delivery_id:  deliveryId,
             provider_id:  provider.id,
             status_code:  status === "failed" ? pick([400, 403, 429, 500, 550]) : 202,
+            success:      status !== "failed",
+            error:        status === "failed" ? pick(ERRORS[channel]!) : null,
+            duration_ms:  between(80, 900),
             cost:         (COST[provider.kind] ?? 0).toFixed(4),
             attempted_at: new Date(created.getTime() + attempt * 30_000),
           });
