@@ -65,9 +65,17 @@ export async function unseal(value: string | undefined | null): Promise<Session 
   }
 }
 
+// Secure (HTTPS-only) in production. COOKIE_SECURE=false allows a plain-HTTP
+// deployment such as http://<server-ip>:3001, where the browser would
+// otherwise drop the cookie and every login would bounce back to /login.
+const COOKIE_SECURE =
+  process.env.COOKIE_SECURE === undefined
+    ? process.env.NODE_ENV === "production"
+    : process.env.COOKIE_SECURE !== "false";
+
 export const cookieOptions = {
   httpOnly: true,
-  secure:   process.env.NODE_ENV === "production",
+  secure:   COOKIE_SECURE,
   sameSite: "strict" as const,
   path:     "/",
   maxAge:   SESSION_TTL_S,

@@ -14,6 +14,10 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // self-contained server for the Docker image (apps/web/Dockerfile)
+  output:                 "standalone",
+  // the monorepo root, so the shared @repo/schema workspace is traced in
+  outputFileTracingRoot:  path.join(__dirname, "..", ".."),
   // don't advertise the framework
   poweredByHeader: false,
   turbopack: {
