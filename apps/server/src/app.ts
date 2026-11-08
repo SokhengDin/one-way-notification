@@ -2,7 +2,7 @@
 // tests mount the same `AppRoutes` in-process via `HttpRouter.toWebHandler`,
 // so there is exactly one copy of this wiring.
 import { Api } from "@repo/schema";
-import { Layer } from "effect";
+import { Config, Layer } from "effect";
 import { HttpMiddleware } from "effect/unstable/http";
 import { HttpApiBuilder, HttpApiSwagger } from "effect/unstable/httpapi";
 import { PgLive } from "./pg";
@@ -20,14 +20,20 @@ import { AuthApiHandlers } from "./domain/auth/auth.http";
 import { AuthMiddlewareLive } from "./domain/auth/auth.middleware";
 import { Auth } from "./domain/auth/auth";
 import { AdminBootstrapLive } from "./domain/auth/auth.bootstrap";
+import { FileStore } from "./storage/file-store";
 
 const SwaggerLive = HttpApiSwagger.layer(Api, { path: "/docs" });
 
 /**
- * The routes, with the way messages leave the building plugged in: the real
- * provider adapters in production, a scripted fake in tests.
+ * The routes, with the two ways the app touches the outside world plugged
+ * in: how messages leave the building (real provider adapters in
+ * production, a scripted fake in tests) and where files are kept (file-vault
+ * in production, in memory in tests).
  */
-export const makeAppRoutes = (senders: Layer.Layer<SenderRegistry>) => {
+export const makeAppRoutes = (
+  senders: Layer.Layer<SenderRegistry>,
+  files:   Layer.Layer<FileStore, Config.ConfigError> = FileStore.fileVault,
+) => {
   const ApiLive = HttpApiBuilder.layer(Api).pipe(
     Layer.provide([
       UsersApiHandlers,
@@ -41,6 +47,7 @@ export const makeAppRoutes = (senders: Layer.Layer<SenderRegistry>) => {
       SystemApiHandlers,
     ]),
     Layer.provide(senders),
+    Layer.provide(files),
     Layer.provide(PgLive),
   );
   const AuthLive = AuthMiddlewareLive.pipe(Layer.provide(Auth.layer), Layer.provide(PgLive));

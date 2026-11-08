@@ -39,19 +39,26 @@ export function makeSqlAssetsRepo(sql: SqlClient): AssetRepoService {
     "AssetsRepo.findAssetFile",
   )(function* (id) {
     const rows = yield* sql<{
-      readonly id:           string;
-      readonly filename:     string;
-      readonly content_type: AssetContentType;
-      readonly sha256:       string;
-      readonly data:         Uint8Array;
+      readonly id:                 string;
+      readonly filename:           string;
+      readonly content_type:       AssetContentType;
+      readonly sha256:             string;
+      readonly storage_file_id:    string | null;
+      readonly storage_version_id: string | null;
+      readonly data:               Uint8Array | null;
     }>`
-      SELECT id, filename, content_type, sha256, data
+      SELECT id, filename, content_type, sha256, storage_file_id, storage_version_id, data
       FROM brand_assets
       WHERE id = ${id} AND deleted_at IS NULL
     `.pipe(mapSqlError("findAssetData"));
 
     const row = rows[0];
-    return row ? { ...row, data: new Uint8Array(row.data) } : null;
+    if (!row) return null;
+
+    const { storage_file_id, storage_version_id, data, ...file } = row;
+    return storage_file_id !== null && storage_version_id !== null
+      ? { ...file, location: { kind: "storage", storage: { file_id: storage_file_id, version_id: storage_version_id } } }
+      : { ...file, location: { kind: "inline", data: new Uint8Array(data ?? new Uint8Array()) } };
   });
 
   const putAsset: AssetRepoService["putAsset"] = Effect.fn(
@@ -81,11 +88,12 @@ export function makeSqlAssetsRepo(sql: SqlClient): AssetRepoService {
 
       const rows = yield* sql<AssetRow>`
         INSERT INTO brand_assets
-          (external_system_id, kind, filename, content_type, byte_size, width, height, sha256, data)
+          (id, external_system_id, kind, filename, content_type, byte_size, width, height, sha256,
+           storage_file_id, storage_version_id)
         VALUES (
-          ${input.external_system_id}, ${input.kind}, ${input.filename}, ${input.content_type},
-          ${input.data.byteLength}, ${input.width}, ${input.height}, ${input.sha256},
-          ${Buffer.from(input.data)}
+          ${input.id}, ${input.external_system_id}, ${input.kind}, ${input.filename}, ${input.content_type},
+          ${input.byte_size}, ${input.width}, ${input.height}, ${input.sha256},
+          ${input.storage.file_id}, ${input.storage.version_id}
         )
         RETURNING id, external_system_id, kind, filename, content_type, byte_size, width, height, sha256, created_at, updated_at
       `;
@@ -99,17 +107,23 @@ export function makeSqlAssetsRepo(sql: SqlClient): AssetRepoService {
   const deleteAsset: AssetRepoService["deleteAsset"] = Effect.fn(
     "AssetsRepo.deleteAsset",
   )(function* (externalSystemId, kind) {
-    const rows = yield* sql<{ id: string }>`
+    const rows = yield* sql<{ storage_file_id: string | null; storage_version_id: string | null }>`
       UPDATE brand_assets
       SET deleted_at = now(), updated_at = now()
       WHERE external_system_id = ${externalSystemId}
         AND kind = ${kind}
         AND deleted_at IS NULL
         AND replaced_at IS NULL
-      RETURNING id
+      RETURNING storage_file_id, storage_version_id
     `.pipe(mapSqlError("deleteAsset"));
 
-    return rows.length > 0;
+    const row = rows[0];
+    if (!row) return false;
+    return {
+      storage: row.storage_file_id !== null && row.storage_version_id !== null
+        ? { file_id: row.storage_file_id, version_id: row.storage_version_id }
+        : null,
+    };
   });
 
   return { listAssets, findAssetFile, putAsset, deleteAsset };

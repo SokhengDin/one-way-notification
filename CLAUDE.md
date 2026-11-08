@@ -123,7 +123,9 @@ Migrations in `apps/server/db/migrations/`, applied in filename order:
 `channel_providers`, `notifications`, `notification_deliveries`,
 `provider_usage_log`), `002_create_brand_assets.sql` (`brand_assets`) and
 `003_provider_configuration.sql` (provider `kind`, `config`, encrypted
-`secrets`, `secret_keys`, `priority` on `channel_providers`).
+`secrets`, `secret_keys`, `priority` on `channel_providers`), and later
+numbered files up to `007_brand_assets_file_vault.sql` (asset bytes move
+to file-vault: `storage_file_id` / `storage_version_id`, `data` nullable).
 Soft deletes via nullable `deleted_at` almost everywhere
 (`provider_usage_log` is the one intentional exception — pure append-only
 log). `brand_assets` additionally has `replaced_at`: a replaced asset is
@@ -168,6 +170,27 @@ Invalid templates are `NotificationTemplateInvalid` (422, with `issues`).
 `POST /api/notification-template/preview` renders an unsaved draft (the
 dashboard's live preview).
 
+## File storage (file-vault)
+
+File bytes are not kept in Postgres: they live in file-vault
+(SokhengDin/one-way-file-service, Rust), behind the `FileStore` service
+(`apps/server/src/storage/file-store.ts`) — `put` / `get(fileId,
+versionId)` / `remove` (to file-vault's trash), every failure a typed
+`FileStorageUnavailable` (503, in `@repo/schema`). The HTTP calls are plain
+async functions in `storage/file-vault-client.ts` (scripts use it directly).
+`makeAppRoutes(senders, files)` takes the store like it takes the senders:
+`FileStore.fileVault` in production, and in tests the real client pointed at
+`test/fake-file-vault.ts`, an in-memory server with the same API (inspect
+`fakeVault.files`, inject failures with `fakeVault.failWith = 503`).
+
+Config: `FILE_VAULT_URL` + `FILE_VAULT_API_KEY` (scopes `files:read
+files:write files:delete`, plus `spaces:manage` without
+`FILE_VAULT_SPACE_ID`). Optional like `PROVIDER_SECRET_KEY`: without them
+the API runs and uploads answer 503. The space is `FILE_VAULT_SPACE_ID`, or
+the one named `FILE_VAULT_SPACE_NAME` (default `one-way-notification`),
+found or created on first use. Reads pin the exact version, so they are
+immutable and cached in-process (32 MiB LRU).
+
 ## Brand assets
 
 `apps/server/src/domain/assets/`. One current asset per (system, kind),
@@ -179,6 +202,15 @@ dimensions, caps size (2 MiB) and pixels (8192/side), and rejects SVGs with
 scripts, handlers, external references or entities. `GET /api/asset/:id`
 serves bytes with the sniffed type, immutable caching, `nosniff`, and a
 sandboxing CSP for SVG.
+
+Bytes go to file-vault under `brand-assets/<system>/<kind>/<asset id>.<ext>`
+(one file per asset, so a replacement never becomes a new version of an old
+URL). Upload order is file first, row second; if the row can't be written
+the file is removed again. Deleting the current asset trashes its file;
+replaced ones keep theirs (sent emails show them). Rows from before
+migration 007 still hold `data` and are served from it; `bun run
+assets:move-to-file-vault [--dry-run]` moves them (idempotent, ids/URLs
+unchanged).
 
 ## Providers
 
