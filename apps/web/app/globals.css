@@ -169,3 +169,13 @@
   --viz-axis:     #383835;
   --viz-up-good:  #0ca30c;
 }
+
+/* list rows ease in */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 0.28s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .fade-up { animation: none; }
+}

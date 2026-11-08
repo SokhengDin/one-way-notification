@@ -202,6 +202,8 @@ status, previous-period totals, per-day series counted in the given
 timezone, channels, providers (attempts + cost from `provider_usage_log`),
 top event types / systems, recent failures, inventory. Deliveries are
 windowed by `created_at` with their current status. `bun run seed:demo`
+(templates and payloads in `db/seed-catalog.ts`, checked by
+`test/seed-catalog.test.ts`)
 fills a dev database (name must contain dev/test/demo/local) with ~45 days
 of deterministic traffic.
 
@@ -254,6 +256,11 @@ planned file API plugs in as another `AssetSource` there.
   breaker: 3 provider-side failures in a row → cooldown (30 s doubling, max
   15 min); recipient errors don't count. Operator API: list/filter, detail
   with attempts, retry, cancel, bulk retry, queue stats, process-now.
+  Within a batch, a template's renderer, a channel's providers and a
+  provider's credentials are looked up once (`makeBatchCache`).
+  `bun run bench` (apps/server/bench) load-tests ingest and parallel workers
+  against a throwaway `notification_bench` database with a slow, flaky fake
+  provider, and fails if anything is lost or sent twice.
 - `auth` — dashboard sign-in. `admins` (Argon2id via `Bun.password`, lock
   after 5 failures for 15 min) and `admin_sessions` (only a SHA-256 of the
   `own_…` bearer token is stored, 12 h lifetime). A global

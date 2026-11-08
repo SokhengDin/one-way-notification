@@ -77,7 +77,7 @@ export default function ProvidersPage() {
         description="Where notifications are sent through. Per channel, the lowest priority is tried first and the next one takes over if it fails."
         actions={<LinkButton href="/providers/new">New provider</LinkButton>}
       />
-      <ListToolbar>
+      <ListToolbar count={query.data?.data.total}>
         <Segmented
           label="Channel"
           options={CHANNEL_TABS}

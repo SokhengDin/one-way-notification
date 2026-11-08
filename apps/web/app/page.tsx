@@ -19,6 +19,7 @@ import {
   StackedBar,
   StatTile,
 } from "../components/dashboard/charts";
+import { Attention } from "../components/attention";
 import { PageHeader } from "../components/page-header";
 import { ChannelBadge } from "../components/status-badge";
 import { getStatsOverview } from "../lib/api/stats";
@@ -58,6 +59,7 @@ export default function OverviewPage() {
   return (
     <div>
       <PageHeader title="Overview" description="Delivery activity across every channel, system and provider." />
+      <Attention />
 
       {/* filters: one row, above everything they scope */}
       <div className="mb-6 flex flex-wrap items-center gap-3">

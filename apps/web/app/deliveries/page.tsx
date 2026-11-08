@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DataTable, type DataTableColumn } from "../../components/data-table";
@@ -27,6 +27,7 @@ import { timeAgo } from "../../lib/format";
 import { useProviders } from "../../lib/lookups";
 import { useDebounced } from "../../lib/use-debounced";
 import { useMounted } from "../../lib/use-mounted";
+import { useSlashFocus } from "../../lib/use-slash-focus";
 
 type StatusFilter = "all" | DeliveryStatus;
 
@@ -99,7 +100,9 @@ function Deliveries() {
   const providerId = searchParams.get("provider") ?? "all";
   const [search, setSearch] = useState(searchParams.get("q") ?? "");
   const q          = useDebounced(search.trim());
-  const [page, setPage] = useState({ skip: 0, limit: 25 });
+  const [page, setPage] = useState({ skip: 0, limit: 20 });
+  const searchRef = useRef<HTMLInputElement>(null);
+  useSlashFocus(searchRef);
 
   const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -189,16 +192,34 @@ function Deliveries() {
           <div className="relative min-w-64 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
+              ref={searchRef}
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage((current) => ({ ...current, skip: 0 }));
               }}
               placeholder="Search recipient, user, event or error…"
-              className="pl-8"
+              className="pr-8 pl-8"
               aria-label="Search deliveries"
             />
+            {search ? (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+                className="absolute top-1/2 right-1.5 flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3.5" aria-hidden />
+              </button>
+            ) : (
+              <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-[10px] text-muted-foreground">/</kbd>
+            )}
           </div>
+          {deliveriesQuery.data && (
+            <span className="ml-auto self-center rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground tabular-nums">
+              {deliveriesQuery.data.data.total.toLocaleString()} {deliveriesQuery.data.data.total === 1 ? "row" : "rows"}
+            </span>
+          )}
           {filtered && (
             <button
               type="button"

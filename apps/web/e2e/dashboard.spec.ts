@@ -342,8 +342,13 @@ test.describe("templates", () => {
 
   test("the list shows both templates", async ({ page }) => {
     await page.goto("/notifications/templates");
-    await expect(page.getByRole("link", { name: "order.shipped" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "otp.requested" })).toBeVisible();
+    // the demo seed has templates with the same event names in other systems
+    const ours   = page.getByRole("row").filter({ hasText: SYSTEM_NAME });
+    const search = page.getByLabel("Search event or subject…");
+    await search.fill("order.shipped");
+    await expect(ours.getByRole("link", { name: "order.shipped" })).toBeVisible();
+    await search.fill("otp.requested");
+    await expect(ours.getByRole("link", { name: "otp.requested" })).toBeVisible();
   });
 
   test("delete through the confirm dialog", async ({ page, request }) => {
@@ -354,8 +359,14 @@ test.describe("templates", () => {
 
     await expect(page).toHaveURL(/\/notifications\/templates$/);
     await expect(page.getByText("Template deleted")).toBeVisible();
-    await expect(page.getByRole("link", { name: "order.shipped" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "otp.requested" })).toBeVisible();
+    const ours   = page.getByRole("row").filter({ hasText: SYSTEM_NAME });
+    const search = page.getByLabel("Search event or subject…");
+    await search.fill("order.shipped");
+    // the search has applied once the demo shop's own order.shipped shows
+    await expect(page.getByRole("row").filter({ hasText: "Demo Shop" }).first()).toBeVisible();
+    await expect(ours.getByRole("link", { name: "order.shipped" })).toHaveCount(0);
+    await search.fill("otp.requested");
+    await expect(ours.getByRole("link", { name: "otp.requested" })).toBeVisible();
 
     const id = templatePath.split("/").pop();
     expect((await request.get(`/api/proxy/api/notification-template/${id}`)).status()).toBe(404);
