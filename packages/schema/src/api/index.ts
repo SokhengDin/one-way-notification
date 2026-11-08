@@ -6,6 +6,7 @@ import { UsersApiGroup } from "./users";
 import { AssetsApiGroup } from "./assets";
 import { StatsApiGroup } from "./stats";
 import { DeliveriesApiGroup } from "./deliveries";
+import { AuthApiGroup } from "./auth";
 
 export class SystemApiGroup extends HttpApiGroup.make("system", {
   topLevel: true,
@@ -23,5 +24,6 @@ export class Api extends HttpApi.make("one-way-notification-api")
   .add(AssetsApiGroup)
   .add(StatsApiGroup)
   .add(DeliveriesApiGroup)
+  .add(AuthApiGroup)
   .add(SystemApiGroup)
 {}

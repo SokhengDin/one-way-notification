@@ -58,7 +58,7 @@ export default function NewNotificationTemplatePage() {
 
   return (
     <div>
-      <PageHeader title="New template" />
+      <PageHeader title="New template" back={{ href: "/notifications/templates", label: "Templates" }} />
       <div className="grid gap-6 xl:grid-cols-2">
       <Card title="Template">
         <form

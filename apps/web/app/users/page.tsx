@@ -1,15 +1,15 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
 import { useState } from "react";
 import type { UserRecord } from "@repo/schema";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { DataTable, type DataTableColumn } from "../../components/data-table";
 import { LinkButton } from "../../components/button";
 import { UserLink } from "../../components/entity-links";
+import { ListToolbar } from "../../components/list-toolbar";
 import { PageHeader } from "../../components/page-header";
+import { ChannelBadge } from "../../components/status-badge";
 import { listUsers } from "../../lib/api/users";
 import { timeAgo } from "../../lib/format";
 import { useDebounced } from "../../lib/use-debounced";
@@ -18,6 +18,13 @@ const columns: ReadonlyArray<DataTableColumn<UserRecord>> = [
   {
     header: "User",
     cell: (row) => <UserLink id={row.id} name={row.display_name} detail={row.email} />,
+  },
+  {
+    header: "Reachable on",
+    cell: (row) =>
+      row.channels.length === 0
+        ? <span className="text-xs text-muted-foreground">no contacts</span>
+        : <div className="flex flex-wrap gap-1">{row.channels.map((channel) => <ChannelBadge key={channel} channel={channel} />)}</div>,
   },
   {
     header: "Created",
@@ -44,24 +51,24 @@ export default function UsersPage() {
         description="The people notifications go to."
         actions={<LinkButton href="/users/new">New user</LinkButton>}
       />
-      <div className="relative mb-4 max-w-md">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(event) => {
-            setSearch(event.target.value);
-            setPagination((current) => ({ ...current, skip: 0 }));
-          }}
-          placeholder="Search by name, email or external id…"
-          className="pl-8"
-          aria-label="Search users"
-        />
-      </div>
+      <ListToolbar
+        search={search}
+        onSearchChange={(value) => {
+          setSearch(value);
+          setPagination((current) => ({ ...current, skip: 0 }));
+        }}
+        placeholder="Search by name, email or external id…"
+        searchLabel="Search users"
+        active={q !== ""}
+        onClear={() => setSearch("")}
+      />
       <div className={cn("transition-opacity", query.isPlaceholderData && "opacity-60")}>
         <DataTable
           columns={columns}
           data={query.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/users/${row.id}`}
+          emptyAction={!q && <LinkButton href="/users/new">Add a user</LinkButton>}
           isLoading={query.isLoading}
           error={query.error}
           emptyMessage={q ? "No users match." : "No users yet."}

@@ -7,12 +7,14 @@ import {
   FileStack,
   Inbox,
   LayoutDashboard,
+  LogOut,
   Radio,
   Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
+import { getMe, signOut } from "../lib/api/auth";
 import { getDeliveryQueue } from "../lib/api/deliveries";
 import { useMounted } from "../lib/use-mounted";
 
@@ -105,6 +107,32 @@ function NavLink({ label, href, icon: Icon, badge }: NavItem) {
   );
 }
 
+function Account() {
+  const query = useQuery({ queryKey: ["me"], queryFn: getMe, staleTime: 5 * 60_000 });
+  const mounted = useMounted();
+  const admin   = mounted ? query.data?.data : undefined;
+  return (
+    <div className="mt-auto flex items-center gap-2.5 border-t border-sidebar-border px-3 pt-4">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-foreground">
+        {admin ? admin.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() : ""}
+      </span>
+      <div className="min-w-0 flex-1 leading-tight">
+        <div className="truncate text-sm font-medium text-sidebar-foreground">{admin?.name ?? " "}</div>
+        <div className="truncate text-xs text-sidebar-foreground/50">{admin?.email ?? " "}</div>
+      </div>
+      <button
+        type="button"
+        onClick={() => void signOut()}
+        title="Sign out"
+        aria-label="Sign out"
+        className="rounded-md p-1.5 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      >
+        <LogOut className="size-4" />
+      </button>
+    </div>
+  );
+}
+
 export function Sidebar() {
   return (
     <nav className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 overflow-y-auto bg-sidebar px-3 py-6 text-sidebar-foreground">
@@ -132,6 +160,7 @@ export function Sidebar() {
           </div>
         ))}
       </div>
+      <Account />
     </nav>
   );
 }

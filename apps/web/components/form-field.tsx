@@ -13,16 +13,18 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface FieldWrapperProps {
   readonly label: string;
+  /** keep the label for screen readers only (filters in a toolbar) */
+  readonly hideLabel?: boolean;
   readonly htmlFor: string;
   readonly error?: string;
   readonly hint?: string;
   readonly children: ReactNode;
 }
 
-function FieldWrapper({ label, htmlFor, error, hint, children }: FieldWrapperProps) {
+function FieldWrapper({ label, hideLabel, htmlFor, error, hint, children }: FieldWrapperProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
+      <Label htmlFor={htmlFor} className={hideLabel ? "sr-only" : undefined}>{label}</Label>
       {children}
       {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -80,6 +82,7 @@ interface SelectFieldProps {
   readonly hint?: string;
   readonly id?: string;
   readonly className?: string;
+  readonly hideLabel?: boolean;
 }
 
 export function SelectField({
@@ -91,10 +94,11 @@ export function SelectField({
   hint,
   id,
   className,
+  hideLabel,
 }: SelectFieldProps) {
   const fieldId = id ?? label;
   return (
-    <FieldWrapper label={label} htmlFor={fieldId} error={error} hint={hint}>
+    <FieldWrapper label={label} hideLabel={hideLabel} htmlFor={fieldId} error={error} hint={hint}>
       {/* items lets the trigger show the option's label, not its raw value */}
       <Select items={options.map((option) => ({ value: option.value, label: option.label }))} value={value} onValueChange={(next) => onValueChange(next as string)}>
         <SelectTrigger id={fieldId} className={`w-full ${className ?? ""}`}>

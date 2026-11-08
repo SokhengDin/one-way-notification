@@ -11,6 +11,7 @@ import { Card } from "../../../components/card";
 import { TextField } from "../../../components/form-field";
 import { DataTable, type DataTableColumn } from "../../../components/data-table";
 import { PageHeader } from "../../../components/page-header";
+import { IdChip } from "../../../components/id-chip";
 import { UserLink } from "../../../components/entity-links";
 import { UserPicker } from "../../../components/pickers";
 import {
@@ -80,8 +81,11 @@ export default function ExternalSystemDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        back={{ href: "/external-systems", label: "External systems" }}
         title={systemQuery.data?.data.name ?? "External system"}
         actions={
+          <>
+          <IdChip id={systemId} />
           <ConfirmButton
             label="Delete system"
             title="Delete this external system?"
@@ -89,6 +93,7 @@ export default function ExternalSystemDetailPage() {
             isPending={deleteMutation.isPending}
             onConfirm={() => deleteMutation.mutate()}
           />
+          </>
         }
       />
 
@@ -134,6 +139,7 @@ export default function ExternalSystemDetailPage() {
           columns={linkColumns}
           data={linksQuery.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/users/${row.user_id}`}
           isLoading={linksQuery.isLoading}
           error={linksQuery.error}
           emptyMessage="No users linked to this system yet."

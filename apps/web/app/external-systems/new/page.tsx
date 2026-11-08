@@ -21,7 +21,7 @@ export default function NewExternalSystemPage() {
 
   return (
     <div>
-      <PageHeader title="New external system" />
+      <PageHeader title="New external system" back={{ href: "/external-systems", label: "External systems" }} />
       <Card>
         <form
           className="flex flex-col gap-4"

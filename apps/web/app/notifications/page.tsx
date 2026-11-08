@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { LinkButton } from "../../components/button";
 import { DataTable, type DataTableColumn } from "../../components/data-table";
 import { SystemLink, UserLink } from "../../components/entity-links";
+import { ListToolbar } from "../../components/list-toolbar";
 import { PageHeader } from "../../components/page-header";
 import { SystemPicker } from "../../components/pickers";
 import { Segmented } from "../../components/segmented";
@@ -76,7 +77,14 @@ export default function NotificationsPage() {
         description="Each event an external system sent, and how its deliveries went."
         actions={<LinkButton href="/notifications/new">New notification</LinkButton>}
       />
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <ListToolbar
+        active={outcome !== "all" || systemId !== ""}
+        onClear={() => {
+          setOutcome("all");
+          setSystemId("");
+          setPagination((current) => ({ ...current, skip: 0 }));
+        }}
+      >
         <Segmented
           label="Outcome"
           options={OUTCOMES}
@@ -86,28 +94,25 @@ export default function NotificationsPage() {
             setPagination((current) => ({ ...current, skip: 0 }));
           }}
         />
-        <div className="w-64">
+        <div className="w-56">
           <SystemPicker
             label="External system"
+            hideLabel
+            allLabel="All systems"
             value={systemId}
-            placeholder="All systems"
             onChange={(id) => {
-              setSystemId(id === systemId ? "" : id);
+              setSystemId(id);
               setPagination((current) => ({ ...current, skip: 0 }));
             }}
           />
         </div>
-        {systemId && (
-          <button type="button" className="h-9 text-sm text-muted-foreground hover:text-foreground" onClick={() => setSystemId("")}>
-            Clear
-          </button>
-        )}
-      </div>
+      </ListToolbar>
       <div className={cn("transition-opacity", query.isPlaceholderData && "opacity-60")}>
         <DataTable
           columns={columns}
           data={query.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/notifications/${row.id}`}
           isLoading={query.isLoading}
           error={query.error}
           emptyMessage="No notifications match."

@@ -1,5 +1,5 @@
 import type { AssetContentType, AssetKind, BrandAssetRecord } from "@repo/schema";
-import { API_BASE_URL, runApi } from "../api-client";
+import { PROXY_PATH, runApi } from "../api-client";
 
 export const listAssets = (externalSystemId: string) =>
   runApi((client) => client.assets.listAssets({ params: { id: externalSystemId } }));
@@ -19,7 +19,7 @@ export const deleteAsset = (externalSystemId: string, kind: AssetKind) =>
   );
 
 /** Absolute URL of an asset's file, for <img src>. */
-export const assetFileUrl = (asset: Pick<BrandAssetRecord, "url">) => `${API_BASE_URL}${asset.url}`;
+export const assetFileUrl = (asset: Pick<BrandAssetRecord, "url">) => `${PROXY_PATH}${asset.url}`;
 
 /** Read a File as a data: URL (the API accepts the prefix as-is). */
 export const readFileAsDataUrl = (file: File) =>

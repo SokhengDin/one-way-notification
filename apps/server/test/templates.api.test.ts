@@ -140,7 +140,7 @@ describe("get and list templates", () => {
     expect((await api("GET", "/api/notification-template/not-a-uuid")).status).toBe(400);
   });
 
-  test("list is paginated, newest first, and filterable by system", async () => {
+  test("list is paginated, sorted by event, and filterable by system, channel and text", async () => {
     const a = await createSystem();
     const b = await createSystem();
     for (const event of ["e1", "e2", "e3"]) {
@@ -153,10 +153,16 @@ describe("get and list templates", () => {
 
     const page = await api("GET", `/api/notification-template?external_system_id=${a.id}&limit=2&skip=0`);
     expect(page.json.data).toMatchObject({ total: 3, skip: 0, limit: 2 });
-    expect(page.json.data.items.map((t: { event_type: string }) => t.event_type)).toEqual(["e3", "e2"]);
+    expect(page.json.data.items.map((t: { event_type: string }) => t.event_type)).toEqual(["e1", "e2"]);
+    // the system's name comes with each template
+    expect(page.json.data.items[0].system_name).toBe(a.name);
 
     const next = await api("GET", `/api/notification-template?external_system_id=${a.id}&limit=2&skip=2`);
-    expect(next.json.data.items.map((t: { event_type: string }) => t.event_type)).toEqual(["e1"]);
+    expect(next.json.data.items.map((t: { event_type: string }) => t.event_type)).toEqual(["e3"]);
+
+    await createTemplate({ external_system_id: a.id, event_type: "e1", channel: "sms", template: "x", subject: null });
+    expect((await api("GET", "/api/notification-template?channel=sms")).json.data.total).toBe(1);
+    expect((await api("GET", "/api/notification-template?q=oth")).json.data.items.map((t: { event_type: string }) => t.event_type)).toEqual(["other"]);
   });
 
   test("deleted templates are excluded from list and get", async () => {

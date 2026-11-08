@@ -21,7 +21,7 @@ export default function NewUserPage() {
 
   return (
     <div>
-      <PageHeader title="New user" description="Add contacts (email, phone, Telegram) on the next page." />
+      <PageHeader back={{ href: "/users", label: "Users" }} title="New user" description="Add contacts (email, phone, Telegram) on the next page." />
       <Card>
         <form
           className="flex max-w-md flex-col gap-4"

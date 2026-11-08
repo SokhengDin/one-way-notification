@@ -56,7 +56,7 @@ export default function ProviderDetailPage() {
   if (providerQuery.isError) {
     return (
       <div>
-        <PageHeader title="Provider" />
+        <PageHeader title="Provider" back={{ href: "/providers", label: "Providers" }} />
         <Card>
           <p className="text-sm text-destructive" role="alert" data-testid="load-error">
             {errorTag(providerQuery.error) === "ChannelProviderNotFound"
@@ -76,6 +76,7 @@ export default function ProviderDetailPage() {
   return (
     <div>
       <PageHeader
+        back={{ href: "/providers", label: "Providers" }}
         title={provider?.name ?? "Provider"}
         description={provider ? (spec ? spec.label : "Not configured") : undefined}
         actions={

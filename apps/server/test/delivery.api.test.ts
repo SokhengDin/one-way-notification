@@ -451,8 +451,9 @@ describe("users have readable names", () => {
 
     await addContact(anonymous.id, "email", "someone@example.com");
     expect((await api("GET", `/api/user/${anonymous.id}`)).json.data).toMatchObject({
-      name: null, email: "someone@example.com", display_name: "someone@example.com",
+      name: null, email: "someone@example.com", display_name: "someone@example.com", channels: ["email"],
     });
+    expect(named).toMatchObject({ channels: [] });
   });
 
   test("rename, clear, and search", async () => {
@@ -466,6 +467,17 @@ describe("users have readable names", () => {
     const cleared = await api("PATCH", `/api/user/${user.id}`, { name: "" });
     expect(cleared.json.data.name).toBeNull();
     expect((await api("PATCH", `/api/user/${crypto.randomUUID()}`, { name: "x" })).status).toBe(404);
+  });
+});
+
+describe("external systems carry activity counts", () => {
+  test("templates, linked users and recent notifications", async () => {
+    const { system, user } = await setup();
+    await api("POST", `/api/external-system/${system.id}/link`, { external_user_id: "u-1", user_id: user.id });
+    await notify(system.id, user.id);
+    const fetched = (await api("GET", `/api/external-system/${system.id}`)).json.data;
+    expect(fetched).toMatchObject({ template_count: 1, user_count: 1, notifications_30d: 1 });
+    expect(fetched.last_notification_at).not.toBeNull();
   });
 });
 

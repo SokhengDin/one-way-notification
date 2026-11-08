@@ -6,6 +6,7 @@ export class NotificationTemplateRecord extends Schema.Class<NotificationTemplat
 )({
   id: Schema.String,
   external_system_id: Schema.String,
+  system_name: Schema.String,
   event_type: Schema.String,
   channel: channelTypeSchema,
   template: Schema.String,
