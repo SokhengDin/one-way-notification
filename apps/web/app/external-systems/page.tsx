@@ -64,6 +64,7 @@ export default function ExternalSystemsPage() {
         actions={<LinkButton href="/external-systems/new">New system</LinkButton>}
       />
       <ListToolbar
+        count={query.data?.data.total}
         search={search}
         onSearchChange={(value) => {
           setSearch(value);

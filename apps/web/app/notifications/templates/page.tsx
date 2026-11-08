@@ -77,6 +77,7 @@ export default function NotificationTemplatesPage() {
         actions={<LinkButton href="/notifications/templates/new">New template</LinkButton>}
       />
       <ListToolbar
+        count={query.data?.data.total}
         search={search}
         onSearchChange={(value) => {
           setSearch(value);

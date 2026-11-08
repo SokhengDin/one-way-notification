@@ -195,6 +195,17 @@ export interface NotificationsService {
     NotificationRepoError | NotificationTemplateNotFound | NotificationTemplateInvalid
   >;
 
+  /**
+   * Load a template and its system's branding once, get back a renderer for
+   * many payloads (the delivery worker renders a batch with one lookup).
+   */
+  readonly prepareRenderer: (
+    id: string,
+  ) => Effect.Effect<
+    (payload: Record<string, unknown>) => Effect.Effect<RenderedTemplate, NotificationTemplateInvalid>,
+    NotificationRepoError | NotificationTemplateNotFound | NotificationTemplateInvalid
+  >;
+
   readonly previewNotificationTemplate: (
     input: PreviewNotificationTemplate,
   ) => Effect.Effect<

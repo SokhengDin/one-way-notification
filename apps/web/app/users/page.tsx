@@ -52,6 +52,7 @@ export default function UsersPage() {
         actions={<LinkButton href="/users/new">New user</LinkButton>}
       />
       <ListToolbar
+        count={query.data?.data.total}
         search={search}
         onSearchChange={(value) => {
           setSearch(value);

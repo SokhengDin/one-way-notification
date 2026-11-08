@@ -78,6 +78,7 @@ export default function NotificationsPage() {
         actions={<LinkButton href="/notifications/new">New notification</LinkButton>}
       />
       <ListToolbar
+        count={query.data?.data.total}
         active={outcome !== "all" || systemId !== ""}
         onClear={() => {
           setOutcome("all");
