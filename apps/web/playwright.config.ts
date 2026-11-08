@@ -15,6 +15,10 @@ const DB_NAME  = process.env.E2E_DB_NAME ?? "notification_e2e_test";
 
 const API_URL = `http://localhost:${API_PORT}`;
 
+// brand assets go to file-vault; e2e runs an in-memory stand-in
+const FILE_VAULT_PORT = Number(process.env.E2E_FILE_VAULT_PORT ?? 3301);
+const FILE_VAULT_KEY  = "fv_e2e_only_key";
+
 // created by the API on first start (ADMIN_EMAIL / ADMIN_PASSWORD)
 export const ADMIN = { email: "e2e-admin@example.com", password: "e2e-admin-password-123" };
 const AUTH_FILE    = "e2e/.auth/admin.json";
@@ -43,6 +47,15 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: "bun test/fake-file-vault.ts",
+      cwd:     "../server",
+      // any reply means it is up (unauthenticated requests get 401)
+      url:     `http://127.0.0.1:${FILE_VAULT_PORT}/v1/spaces`,
+      env:     { FAKE_FILE_VAULT_PORT: String(FILE_VAULT_PORT), FAKE_FILE_VAULT_KEY: FILE_VAULT_KEY },
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
       // test/setup.ts refuses any database whose name lacks "test";
       // seed-demo.ts adds deterministic traffic for the dashboard tests
       command: "bun test/setup.ts && bun db/seed-demo.ts && bun src/index.ts",
@@ -59,6 +72,8 @@ export default defineConfig({
         ADMIN_EMAIL:    ADMIN.email,
         ADMIN_PASSWORD: ADMIN.password,
         ADMIN_NAME:     "E2E Admin",
+        FILE_VAULT_URL:     `http://127.0.0.1:${FILE_VAULT_PORT}`,
+        FILE_VAULT_API_KEY: FILE_VAULT_KEY,
       },
       reuseExistingServer: false,
       timeout: 60_000,

@@ -4,6 +4,7 @@ import { BrandAssetRecord } from "../assets/assets";
 import { AssetInvalid, AssetNotFound, AssetRepoError } from "../assets/assets.errors";
 import { assetContentTypeSchema, assetKindSchema } from "../enums";
 import { ExternalSystemNotFound } from "../external-systems/external-systems.errors";
+import { FileStorageUnavailable } from "../shared/file-storage.errors";
 import { Uuid } from "../shared/ids";
 import { ApiResponse } from "./response";
 
@@ -26,21 +27,22 @@ export class AssetsApiGroup extends HttpApiGroup.make("assets")
         content_type: Schema.optional(assetContentTypeSchema),
       }),
       success: ApiResponse(BrandAssetRecord),
-      error: [ExternalSystemNotFound, AssetInvalid, AssetRepoError],
+      error: [ExternalSystemNotFound, AssetInvalid, AssetRepoError, FileStorageUnavailable],
     }),
     HttpApiEndpoint.make("DELETE")("deleteAsset", "/external-system/:id/asset/:kind", {
       params: { id: Uuid, kind: assetKindSchema },
       success: HttpApiSchema.NoContent,
       error: [AssetNotFound, AssetRepoError],
     }),
-    // Raw bytes with the sniffed Content-Type. Asset URLs are immutable (a
-    // replacement gets a new id), so they are cached aggressively.
+    // Raw bytes with the sniffed Content-Type, read from file storage. Asset
+    // URLs are immutable (a replacement gets a new id), so they are cached
+    // aggressively.
     HttpApiEndpoint.get("getAssetFile", "/asset/:id", {
       params: { id: Uuid },
       success: Schema.Uint8Array.pipe(
         HttpApiSchema.asUint8Array({ contentType: "application/octet-stream" }),
       ),
-      error: [AssetNotFound, AssetRepoError],
+      error: [AssetNotFound, AssetRepoError, FileStorageUnavailable],
     }),
   )
   .prefix("/api")

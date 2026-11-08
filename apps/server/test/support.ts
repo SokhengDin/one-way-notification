@@ -6,6 +6,9 @@ import { Effect } from "effect";
 import { makeAppRoutes } from "../src/app";
 import { SenderRegistry, type OutboundMessage, type SendResult } from "../src/domain/delivery/senders";
 import type { ProviderCredentials } from "../src/domain/providers/providers.types";
+import { FileStore, makeFileStore } from "../src/storage/file-store";
+import { makeFileVaultClient } from "../src/storage/file-vault-client";
+import { startFakeFileVault } from "./fake-file-vault";
 
 // ---------- fake provider network ----------
 //
@@ -47,17 +50,45 @@ const FakeSendersLive = Layer.succeed(SenderRegistry, {
     }),
 });
 
+// ---------- fake file storage ----------
+//
+// A local in-memory file-vault (test/fake-file-vault.ts) reached through the
+// real HTTP client, so uploads, version-pinned reads and deletes go over the
+// wire exactly as in production. Tests inspect `fakeVault.files` and can make
+// it fail with `fakeVault.failWith = 503`.
+
+export const fakeVault = startFakeFileVault();
+
+export const FILE_VAULT_SPACE = "notification-test";
+
+const FakeFileStoreLive = Layer.succeed(
+  FileStore,
+  makeFileStore(
+    makeFileVaultClient({
+      baseUrl:   fakeVault.url,
+      apiKey:    fakeVault.apiKey,
+      spaceName: FILE_VAULT_SPACE,
+      timeoutMs: 5_000,
+    }),
+    // no read cache, so tests see every read reach the vault
+    0,
+  ),
+);
+
 // The real application, mounted in-process: same routes, handlers, services
 // and Postgres repos as production, minus the listening socket and with the
-// provider network faked.
+// provider network and file storage faked.
 const { handler, dispose } = HttpRouter.toWebHandler(
-  makeAppRoutes(FakeSendersLive).pipe(Layer.provide(BunHttpServer.layerHttpServices)),
+  makeAppRoutes(FakeSendersLive, FakeFileStoreLive).pipe(Layer.provide(BunHttpServer.layerHttpServices)),
   { disableLogger: true },
 );
 
 // One app instance is shared by every test file in the run (bun test loads
 // this module once), so it is torn down once, when the process exits.
-process.once("beforeExit", () => void dispose());
+process.once("beforeExit", () => {
+  void dispose();
+  void fakeVault.stop();
+});
 
 export interface ApiResponse<T = any> {
   readonly status:  number;
@@ -135,6 +166,7 @@ export async function resetDb() {
              external_systems
     RESTART IDENTITY CASCADE
   `);
+  fakeVault.reset();
 }
 
 export { sql as testSql };

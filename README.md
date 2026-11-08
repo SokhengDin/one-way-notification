@@ -21,6 +21,15 @@ docker compose up -d --build
 | `backend`   | `API_PORT` (3000)         | runs migrations on start, worker in-process      |
 | `dashboard` | `DASHBOARD_PORT` (3001)   | sign in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`    |
 
+Brand assets (logos, icons, email headers) are stored in
+[file-vault](https://github.com/SokhengDin/one-way-file-service): set
+`FILE_VAULT_URL` and `FILE_VAULT_API_KEY` (a file-vault API key with scopes
+`files:read files:write files:delete spaces:manage`). The API creates a
+`one-way-notification` space on first upload, or uses `FILE_VAULT_SPACE_ID`.
+Without them it still runs, but asset uploads answer 503. Assets uploaded
+before this was added stay in Postgres until you run
+`docker compose exec backend bun db/move-assets-to-file-vault.ts`.
+
 Postgres is not started by default: `DB_HOST=host.docker.internal` reaches a
 database on the Docker host. To run one in compose, uncomment `postgres` (and
 `depends_on` under `backend`) in `docker-compose.yml` and set `DB_HOST=postgres`.
@@ -52,4 +61,6 @@ PORT=3001 bun run dev:web         # dashboard on :3001
 | `bun run typecheck`                   | server typecheck                              |
 | `bun run seed:demo`                   | demo systems, templates and users (dev only)  |
 | `bun run admin:create -- you@x.com`   | create or reset an administrator              |
+| `bun run file-vault:fake`             | in-memory file-vault on :3301 for local dev   |
+| `bun run assets:move-to-file-vault`   | move assets still in Postgres to file-vault   |
 | `bun run bench`                       | delivery throughput benchmark                 |

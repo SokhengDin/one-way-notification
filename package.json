@@ -14,6 +14,8 @@
     "typecheck": "bun --cwd=apps/server run typecheck",
     "seed:demo": "bun --cwd=apps/server run db/seed-demo.ts",
     "admin:create": "bun --cwd=apps/server run db/create-admin.ts",
+    "assets:move-to-file-vault": "bun --cwd=apps/server run db/move-assets-to-file-vault.ts",
+    "file-vault:fake": "bun --cwd=apps/server run test/fake-file-vault.ts",
     "bench": "bun --cwd=apps/server run bench/delivery-bench.ts"
   },
   "devDependencies": {

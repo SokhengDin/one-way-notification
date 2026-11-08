@@ -51,6 +51,42 @@ const deliveryConfig: Config.Config<DeliveryConfig> = Config.all({
   leaseSeconds:   positiveInt("DELIVERY_LEASE_SECONDS", 120, 3600),
 });
 
+export type FileVaultConfig = {
+  readonly url:       string;
+  readonly apiKey:    Redacted.Redacted<string>;
+  // a fixed space; when absent the space named `spaceName` is found or created
+  readonly spaceId:   Option.Option<string>;
+  readonly spaceName: string;
+  readonly timeoutMs: number;
+};
+
+const nonBlank = (value: string) => value.trim() !== "";
+
+// Both FILE_VAULT_URL and FILE_VAULT_API_KEY set → file storage is on.
+// Either missing (or blank) → none: the API runs, but uploads answer 503.
+const fileVaultConfig: Config.Config<Option.Option<FileVaultConfig>> = Config.all({
+  url:       Config.string("FILE_VAULT_URL").pipe(Config.option, Config.map(Option.filter(nonBlank))),
+  apiKey:    Config.redacted("FILE_VAULT_API_KEY").pipe(
+    Config.option,
+    Config.map(Option.filter((key) => nonBlank(Redacted.value(key)))),
+  ),
+  spaceId:   Config.string("FILE_VAULT_SPACE_ID").pipe(Config.option, Config.map(Option.filter(nonBlank))),
+  spaceName: Config.string("FILE_VAULT_SPACE_NAME").pipe(Config.withDefault("one-way-notification")),
+  timeoutMs: positiveInt("FILE_VAULT_TIMEOUT_MS", 10_000, 120_000),
+}).pipe(
+  Config.map(({ url, apiKey, spaceId, spaceName, timeoutMs }) =>
+    Option.all({ url, apiKey }).pipe(
+      Option.map(({ url, apiKey }) => ({
+        url: url.trim().replace(/\/+$/, ""),
+        apiKey,
+        spaceId,
+        spaceName,
+        timeoutMs,
+      })),
+    ),
+  ),
+);
+
 export type AppConfig = {
   readonly db: DatabaseConfig;
   readonly appPort: number;
@@ -62,6 +98,8 @@ export type AppConfig = {
   // it, but saving a provider with credentials fails until it is set.
   readonly providerSecretKey: Option.Option<Redacted.Redacted<string>>;
   readonly delivery: DeliveryConfig;
+  // Where files (brand assets) are stored. None until configured.
+  readonly fileVault: Option.Option<FileVaultConfig>;
 };
 
 const appPortConfig = Config.int("APP_PORT").pipe(Config.withDefault(3000));
@@ -83,6 +121,7 @@ const appConfig: Config.Config<AppConfig> = Config.all({
     Config.map(Option.filter((key) => Redacted.value(key).trim() !== "")),
   ),
   delivery: deliveryConfig,
+  fileVault: fileVaultConfig,
 });
 
 export class AppConfigService extends Context.Service<AppConfigService, AppConfig>()(

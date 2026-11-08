@@ -34,12 +34,23 @@ services:
       DELIVERY_WORKER_ENABLED   : ${DELIVERY_WORKER_ENABLED:-true}
       DELIVERY_CONCURRENCY      : ${DELIVERY_CONCURRENCY:-10}
       DELIVERY_BATCH_SIZE       : ${DELIVERY_BATCH_SIZE:-20}
+      # brand assets live in file-vault (see .env.example)
+      FILE_VAULT_URL            : ${FILE_VAULT_URL:-}
+      FILE_VAULT_API_KEY        : ${FILE_VAULT_API_KEY:-}
+      FILE_VAULT_SPACE_ID       : ${FILE_VAULT_SPACE_ID:-}
+      FILE_VAULT_SPACE_NAME     : ${FILE_VAULT_SPACE_NAME:-one-way-notification}
     # reach a Postgres running on the Docker host (Linux needs this mapping)
     extra_hosts:
       - "host.docker.internal:host-gateway"
     # published so external systems can POST /api/notification with their API key
     ports:
       - "${API_PORT:-3000}:3000"
+    # To reach file-vault by container name (FILE_VAULT_URL=http://file-vault-backend:8080),
+    # put both backends on one external network, e.g. `docker network create alpha_network`,
+    # add the same to file-vault's backend, and uncomment this plus `networks` at the bottom.
+    # networks:
+    #   - default
+    #   - shared
     # depends_on:
     #   postgres:
     #     condition : service_healthy
@@ -118,3 +129,8 @@ services:
 
 # volumes:
 #   pgdata:
+
+# networks:
+#   shared:
+#     external : true
+#     name     : ${SHARED_NETWORK:-alpha_network}
