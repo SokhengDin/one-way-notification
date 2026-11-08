@@ -1,0 +1,18 @@
+# Build context is the repo root (bun workspaces). Keep it small and secret-free.
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.github
+effect-smol
+apps/web/e2e
+apps/server/test
+apps/server/bench
+*.log

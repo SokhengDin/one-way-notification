@@ -1,18 +1,37 @@
-FROM oven/bun:1.3-alpine AS base
-WORKDIR /repo
+# API + delivery worker on Bun. Bun runs the TypeScript directly: no build step.
+# Build from the repo root (the API uses the shared @repo/schema workspace):
+#
+#   docker build -f apps/server/Dockerfile -t one-way-notification-api .
 
-FROM base AS install
-COPY package.json bun.lock bunfig.toml tsconfig.base.json ./
+# ---- dependencies: production only, frozen lockfile
+FROM oven/bun:1.4-slim AS deps
+WORKDIR /app
+COPY package.json bun.lock bunfig.toml ./
+# every workspace's package.json, so bun can resolve the lockfile
+COPY apps/server/package.json     apps/server/
+COPY apps/web/package.json        apps/web/
 COPY packages/schema/package.json packages/schema/
-COPY apps/server/package.json apps/server/
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --production --filter server --filter @repo/schema
 
-FROM base AS run
-COPY --from=install /repo/node_modules ./node_modules
-COPY --from=install /repo/package.json /repo/bunfig.toml /repo/tsconfig.base.json ./
-COPY packages/schema packages/schema
-COPY apps/server apps/server
+# ---- runtime: minimal, non-root
+FROM oven/bun:1.4-slim
+WORKDIR /app
+ENV NODE_ENV=production
+# the whole deps tree: bun's isolated linker keeps per-workspace node_modules
+# made of relative symlinks into /app/node_modules/.bun
+COPY --from=deps --chown=bun:bun /app                         ./
+COPY --chown=bun:bun tsconfig.base.json                       ./
+COPY --chown=bun:bun packages/schema                          ./packages/schema
+COPY --chown=bun:bun apps/server/tsconfig.json                ./apps/server/
+COPY --chown=bun:bun apps/server/src                          ./apps/server/src
+COPY --chown=bun:bun apps/server/db                           ./apps/server/db
 
-WORKDIR /repo/apps/server
+USER bun
+WORKDIR /app/apps/server
 EXPOSE 3000
-CMD ["bun", "run", "src/index.ts"]
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
+  CMD bun -e "fetch('http://127.0.0.1:' + (process.env.APP_PORT ?? 3000) + '/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+# apply pending migrations, then serve (the worker runs in the same process)
+CMD ["sh", "-c", "bun db/migrate.ts && exec bun src/index.ts"]

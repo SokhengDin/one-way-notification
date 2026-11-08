@@ -1,0 +1,120 @@
+# One-way notification: API (+ delivery worker) and the ops dashboard.
+#
+#   cp .env.example .env        # fill in the required values
+#   docker compose up -d --build
+#
+# The API applies pending migrations on every start, then serves on :3000
+# inside the network. The dashboard talks to it server-side, so only the
+# dashboard has to be reachable from a browser.
+#
+# Postgres and the other services below are optional and commented out:
+# point DB_HOST at your own database, or uncomment the `postgres` service.
+
+services:
+
+  backend:
+    build:
+      context    : .
+      dockerfile : apps/server/Dockerfile
+    image          : one-way-notification-api
+    container_name : own-api
+    restart        : unless-stopped
+    env_file       : .env
+    environment:
+      APP_PORT                  : 3000
+      DB_HOST                   : ${DB_HOST:-host.docker.internal}
+      DB_PORT                   : ${DB_PORT:-5432}
+      DB_NAME                   : ${DB_NAME:-notification_db}
+      DB_USER                   : ${DB_USER:-postgres}
+      DB_PASS                   : ${DB_PASS:?set DB_PASS}
+      DB_POOL_MAX               : ${DB_POOL_MAX:-20}
+      PROVIDER_SECRET_KEY       : ${PROVIDER_SECRET_KEY:?set PROVIDER_SECRET_KEY}
+      PUBLIC_URL                : ${PUBLIC_URL:-http://localhost:3000}
+      CORS_ORIGINS              : ${CORS_ORIGINS:-http://localhost:3001}
+      DELIVERY_WORKER_ENABLED   : ${DELIVERY_WORKER_ENABLED:-true}
+      DELIVERY_CONCURRENCY      : ${DELIVERY_CONCURRENCY:-10}
+      DELIVERY_BATCH_SIZE       : ${DELIVERY_BATCH_SIZE:-20}
+    # reach a Postgres running on the Docker host (Linux needs this mapping)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # published so external systems can POST /api/notification with their API key
+    ports:
+      - "${API_PORT:-3000}:3000"
+    # depends_on:
+    #   postgres:
+    #     condition : service_healthy
+
+  dashboard:
+    build:
+      context    : .
+      dockerfile : apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL : ${NEXT_PUBLIC_SITE_URL:-}
+    image          : one-way-notification-dashboard
+    container_name : own-dashboard
+    restart        : unless-stopped
+    environment:
+      NOTIFY_API_URL   : http://backend:3000
+      SESSION_SECRET   : ${SESSION_SECRET:?set SESSION_SECRET}
+      # false only when the dashboard is served over plain HTTP (no TLS proxy)
+      COOKIE_SECURE    : ${COOKIE_SECURE:-true}
+      SECURITY_CONTACT : ${SECURITY_CONTACT:-}
+    ports:
+      - "${DASHBOARD_PORT:-3001}:3000"
+    depends_on:
+      backend:
+        condition : service_healthy
+
+  # ---------- optional: Postgres ----------
+  # Uncomment, set DB_HOST=postgres in .env, and uncomment `depends_on` in backend.
+  #
+  # postgres:
+  #   image          : postgres:17-alpine
+  #   container_name : own-postgres
+  #   restart        : unless-stopped
+  #   environment:
+  #     POSTGRES_DB       : ${DB_NAME:-notification_db}
+  #     POSTGRES_USER     : ${DB_USER:-postgres}
+  #     POSTGRES_PASSWORD : ${DB_PASS:?set DB_PASS}
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   # ports:
+  #   #   - "5432:5432"
+  #   healthcheck:
+  #     test     : ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-notification_db}"]
+  #     interval : 5s
+  #     timeout  : 3s
+  #     retries  : 10
+
+  # ---------- optional: Mailpit (catch-all SMTP for testing) ----------
+  # Add an SMTP provider in the dashboard with host `mailpit`, port 1025, no TLS.
+  # Every email lands in the inbox at http://localhost:8025 instead of being sent.
+  #
+  # mailpit:
+  #   image          : axllent/mailpit:latest
+  #   container_name : own-mailpit
+  #   restart        : unless-stopped
+  #   ports:
+  #     - "8025:8025"
+
+  # ---------- optional: second delivery worker ----------
+  # Workers coordinate through row leases (FOR UPDATE SKIP LOCKED), so extra
+  # replicas only add throughput. Same image, no published port.
+  #
+  # worker:
+  #   image          : one-way-notification-api
+  #   restart        : unless-stopped
+  #   env_file       : .env
+  #   environment:
+  #     DB_HOST                 : ${DB_HOST:-host.docker.internal}
+  #     DB_PASS                 : ${DB_PASS:?set DB_PASS}
+  #     PROVIDER_SECRET_KEY     : ${PROVIDER_SECRET_KEY:?set PROVIDER_SECRET_KEY}
+  #     DELIVERY_WORKER_ENABLED : "true"
+  #   extra_hosts:
+  #     - "host.docker.internal:host-gateway"
+  #   depends_on:
+  #     backend:
+  #       condition : service_healthy
+
+# volumes:
+#   pgdata:
