@@ -11,6 +11,7 @@ export const PgLive = Layer.unwrap(
       database: config.db.name,
       username: config.db.user,
       password: config.db.pass,
+      maxConnections: config.db.poolMax,
     });
   }),
 ).pipe(Layer.provide(AppConfigLive));

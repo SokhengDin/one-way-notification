@@ -6,6 +6,8 @@ export type DatabaseConfig = {
   readonly name: string;
   readonly user: string;
   readonly pass: Redacted.Redacted<string>;
+  // connections in the pool, shared by API requests and the delivery worker
+  readonly poolMax: number;
 };
 
 const databaseConfig: Config.Config<DatabaseConfig> = Config.all({
@@ -14,6 +16,7 @@ const databaseConfig: Config.Config<DatabaseConfig> = Config.all({
   name: Config.string("DB_NAME"),
   user: Config.string("DB_USER"),
   pass: Config.redacted("DB_PASS"),
+  poolMax: Config.int("DB_POOL_MAX").pipe(Config.withDefault(20)),
 });
 
 export type DeliveryConfig = {
@@ -21,6 +24,8 @@ export type DeliveryConfig = {
   readonly workerEnabled: boolean;
   readonly pollIntervalMs: number;
   readonly batchSize: number;
+  // deliveries sent at the same time within one batch
+  readonly concurrency: number;
   // default attempt budget for new deliveries
   readonly maxAttempts: number;
   // per provider call
@@ -40,6 +45,7 @@ const deliveryConfig: Config.Config<DeliveryConfig> = Config.all({
   workerEnabled:  Config.boolean("DELIVERY_WORKER_ENABLED").pipe(Config.withDefault(true)),
   pollIntervalMs: positiveInt("DELIVERY_POLL_INTERVAL_MS", 1000, 60_000),
   batchSize:      positiveInt("DELIVERY_BATCH_SIZE", 20, 500),
+  concurrency:    positiveInt("DELIVERY_CONCURRENCY", 10, 200),
   maxAttempts:    positiveInt("DELIVERY_MAX_ATTEMPTS", 5, 50),
   sendTimeoutMs:  positiveInt("DELIVERY_SEND_TIMEOUT_MS", 15_000, 120_000),
   leaseSeconds:   positiveInt("DELIVERY_LEASE_SECONDS", 120, 3600),

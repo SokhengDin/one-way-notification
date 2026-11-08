@@ -13,7 +13,8 @@
     "test": "bun --cwd=apps/server run test",
     "typecheck": "bun --cwd=apps/server run typecheck",
     "seed:demo": "bun --cwd=apps/server run db/seed-demo.ts",
-    "admin:create": "bun --cwd=apps/server run db/create-admin.ts"
+    "admin:create": "bun --cwd=apps/server run db/create-admin.ts",
+    "bench": "bun --cwd=apps/server run bench/delivery-bench.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

@@ -165,6 +165,28 @@ export class Notifications extends Context.Service<
           return yield* render({ ...template, payload });
         });
 
+      const prepareRenderer: NotificationsService["prepareRenderer"] =
+        Effect.fn("Notifications.prepareRenderer")(function* (id) {
+          const template = yield* repo.findNotificationTemplateById(id);
+          if (template === null) {
+            return yield* new NotificationTemplateNotFound({ id });
+          }
+          const branding = yield* loadBranding(template.external_system_id);
+          if (branding === null) {
+            return yield* invalid([`external_system_id: no external system with id ${template.external_system_id}`]);
+          }
+          return (payload: Record<string, unknown>) => {
+            const result = renderForChannel({ ...template, payload, ...branding, publicUrl: config.publicUrl });
+            if ("problems" in result) return Effect.fail(invalid(result.problems));
+            return Effect.succeed(new RenderedTemplate({
+              ...result,
+              variables: [...result.variables],
+              missing:   [...result.missing],
+              warnings:  [...result.warnings],
+            }));
+          };
+        });
+
       const previewNotificationTemplate: NotificationsService["previewNotificationTemplate"] =
         Effect.fn("Notifications.previewNotificationTemplate")(function* (
           input,
@@ -270,6 +292,7 @@ export class Notifications extends Context.Service<
         listNotificationTemplates,
         updateNotificationTemplate,
         renderNotificationTemplate,
+        prepareRenderer,
         previewNotificationTemplate,
         deleteNotificationTemplate,
         addNotification,

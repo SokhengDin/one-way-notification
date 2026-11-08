@@ -29,9 +29,6 @@ import type {
 } from "./delivery.types";
 import { SenderRegistry } from "./senders";
 
-/** Parallel sends per batch. */
-const CONCURRENCY = 5;
-
 export class DeliveryRepo extends Context.Service<DeliveryRepo, DeliveryRepoService>()(
   "app/domain/delivery/DeliveryRepo",
 ) {
@@ -75,7 +72,33 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
         return { _tag: "Retry", providerId, error, delayMs: retryDelayMs(attempt) };
       };
 
-      const decide = Effect.fn("Deliveries.decide")(function* (claim: ClaimedDelivery) {
+      // Lookups shared by every delivery in one batch: a template's renderer,
+      // a channel's providers, a provider's decrypted credentials. A batch is
+      // seconds long, so nothing goes stale; the next batch looks again.
+      const makeBatchCache = () => {
+        const memo = <A, E>(store: Map<string, Effect.Effect<A, E>>, key: string, load: Effect.Effect<A, E>) => {
+          let cached = store.get(key);
+          if (!cached) {
+            cached = Effect.runSync(Effect.cached(load));
+            store.set(key, cached);
+          }
+          return cached;
+        };
+        const renderers   = new Map<string, Effect.Effect<any, any>>();
+        const candidates  = new Map<string, Effect.Effect<any, any>>();
+        const credentials = new Map<string, Effect.Effect<any, any>>();
+        return {
+          renderer:    (templateId: string) =>
+            memo(renderers, templateId, notifications.prepareRenderer(templateId)) as ReturnType<typeof notifications.prepareRenderer>,
+          providers:   (channel: ClaimedDelivery["channel"]) =>
+            memo(candidates, channel, repo.providersFor(channel)) as ReturnType<typeof repo.providersFor>,
+          credentials: (providerId: string) =>
+            memo(credentials, providerId, providers.resolveProviderCredentials(providerId)) as ReturnType<typeof providers.resolveProviderCredentials>,
+        };
+      };
+      type BatchCache = ReturnType<typeof makeBatchCache>;
+
+      const decide = Effect.fn("Deliveries.decide")(function* (claim: ClaimedDelivery, cache: BatchCache) {
         if (claim.recipient === null || claim.recipient.trim() === "") {
           return { _tag: "Failed", providerId: null, error: `No ${claim.channel} address to send to` } satisfies DeliveryOutcome;
         }
@@ -87,7 +110,8 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
         }
 
         // Render now, not at fan-out: a template fix applies to retries.
-        const rendered = yield* notifications.renderNotificationTemplate(claim.template_id, claim.payload).pipe(
+        const rendered = yield* cache.renderer(claim.template_id).pipe(
+          Effect.flatMap((render) => render(claim.payload)),
           Effect.map((value) => ({ ok: true as const, value })),
           Effect.catchTags({
             NotificationTemplateInvalid:  (error) => Effect.succeed({ ok: false as const, retry: false, error: `Template can't be rendered: ${error.message}` }),
@@ -101,7 +125,7 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
             : ({ _tag: "Failed", providerId: null, error: rendered.error } satisfies DeliveryOutcome);
         }
 
-        const candidates = yield* repo.providersFor(claim.channel);
+        const candidates = yield* cache.providers(claim.channel);
         if (candidates.length === 0) {
           // an operator can still add one; keep the delivery alive
           return retryOrFail(claim, null, `No active ${claim.channel} provider is configured`);
@@ -124,7 +148,7 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
         for (const candidate of candidates) {
           lastProvider = candidate.id;
 
-          const credentials = yield* providers.resolveProviderCredentials(candidate.id).pipe(
+          const credentials = yield* cache.credentials(candidate.id).pipe(
             Effect.map((value) => ({ ok: true as const, value })),
             Effect.catch((error) => Effect.succeed({ ok: false as const, error: describe(error) })),
           );
@@ -170,8 +194,8 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
           : ({ _tag: "Failed", providerId: lastProvider, error } satisfies DeliveryOutcome);
       });
 
-      const processOne = (claim: ClaimedDelivery, workerId: string) =>
-        decide(claim).pipe(
+      const processOne = (claim: ClaimedDelivery, workerId: string, cache: BatchCache) =>
+        decide(claim, cache).pipe(
           Effect.tap((outcome) => repo.complete(claim.id, workerId, outcome)),
           Effect.map((outcome) => outcome._tag),
           // Something unexpected (e.g. the database went away mid-way): log
@@ -185,9 +209,10 @@ export class Deliveries extends Context.Service<Deliveries, DeliveriesService>()
 
       const processDue: DeliveriesService["processDue"] = (workerId) =>
         repo.claimDue(workerId, settings.batchSize, settings.leaseSeconds).pipe(
-          Effect.flatMap((claims) =>
-            Effect.forEach(claims, (claim) => processOne(claim, workerId), { concurrency: CONCURRENCY }),
-          ),
+          Effect.flatMap((claims) => {
+            const cache = makeBatchCache();
+            return Effect.forEach(claims, (claim) => processOne(claim, workerId, cache), { concurrency: settings.concurrency });
+          }),
           Effect.map((outcomes) => ({
             claimed:  outcomes.length,
             sent:     outcomes.filter((tag) => tag === "Sent").length,
