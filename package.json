@@ -12,7 +12,8 @@
     "migrate": "bun --cwd=apps/server run db/migrate.ts",
     "test": "bun --cwd=apps/server run test",
     "typecheck": "bun --cwd=apps/server run typecheck",
-    "seed:demo": "bun --cwd=apps/server run db/seed-demo.ts"
+    "seed:demo": "bun --cwd=apps/server run db/seed-demo.ts",
+    "admin:create": "bun --cwd=apps/server run db/create-admin.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"

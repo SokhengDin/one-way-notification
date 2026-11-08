@@ -1,5 +1,6 @@
 import { Api, ok } from "@repo/schema";
 import { Effect, Layer } from "effect";
+import { HttpServerRequest } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 import { Notifications } from "./notifications";
 
@@ -51,9 +52,18 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
           .pipe(Effect.map((data) => ok(data))),
       )
       .handle("addNotification", ({ payload }) =>
-        notifications
-          .addNotification(payload)
-          .pipe(Effect.map((data) => ok(data, 201, "Created"))),
+        Effect.gen(function* () {
+          // External systems authenticate with their API key; the auth
+          // middleware only lets a key-less request through for a signed-in
+          // administrator (the dashboard's "New notification").
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          const apiKey  = (request.headers as Readonly<Record<string, string | undefined>>)["x-api-key"];
+          if (apiKey !== undefined) {
+            yield* notifications.verifySystemApiKey(payload.external_system_id, apiKey);
+          }
+          const data = yield* notifications.addNotification(payload);
+          return ok(data, 201, "Created");
+        }),
       )
       .handle("getNotificationById", ({ params }) =>
         notifications

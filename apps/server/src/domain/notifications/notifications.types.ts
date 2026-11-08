@@ -10,6 +10,7 @@ import type {
   NotificationRepoError,
   NotificationSummary,
   NotificationUndeliverable,
+  Unauthorized,
   NotificationTemplateConflict,
   NotificationTemplateInvalid,
   NotificationTemplateNotFound,
@@ -30,6 +31,9 @@ export interface AddNotificationTemplate {
 
 export interface ListNotificationTemplatesInput extends PaginationInput {
   readonly external_system_id?: string;
+  readonly channel?: ChannelType;
+  /** matches event type or subject */
+  readonly q?: string;
 }
 
 export interface UpdateNotificationTemplate {
@@ -212,6 +216,12 @@ export interface NotificationsService {
     NotificationRecord,
     NotificationRepoError | NotificationConflict | NotificationUndeliverable
   >;
+
+  /** Fails with Unauthorized unless `apiKey` is this external system's key. */
+  readonly verifySystemApiKey: (
+    externalSystemId: string,
+    apiKey: string,
+  ) => Effect.Effect<void, NotificationRepoError | Unauthorized>;
 
   readonly getNotificationById: (
     id: string,

@@ -10,11 +10,12 @@ import { Card } from "../../../../components/card";
 import { ConfirmButton } from "../../../../components/confirm-button";
 import { TextField } from "../../../../components/form-field";
 import { TemplateEditor } from "../../../../components/template-editor";
+import { SystemLink } from "../../../../components/entity-links";
+import { timeAgo } from "../../../../lib/format";
 import { PageHeader } from "../../../../components/page-header";
 import { ChannelBadge } from "../../../../components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TemplatePreview } from "../../../../components/template-preview";
-import { getExternalSystemById } from "../../../../lib/api/external-systems";
 import {
   deleteNotificationTemplate,
   getNotificationTemplateById,
@@ -35,11 +36,6 @@ export default function NotificationTemplateDetailPage() {
 
   const data = templateQuery.data?.data;
 
-  const systemQuery = useQuery({
-    queryKey: ["external-system", data?.external_system_id],
-    queryFn: () => getExternalSystemById(data!.external_system_id),
-    enabled: !!data,
-  });
 
   const [template, setTemplate] = useState("");
   const [subject, setSubject] = useState("");
@@ -81,7 +77,7 @@ export default function NotificationTemplateDetailPage() {
   if (templateQuery.isError) {
     return (
       <div>
-        <PageHeader title="Template" />
+        <PageHeader title="Template" back={{ href: "/notifications/templates", label: "Templates" }} />
         <Card>
           <p className="text-sm text-destructive" role="alert" data-testid="load-error">
             {errorTag(templateQuery.error) === "NotificationTemplateNotFound"
@@ -99,10 +95,14 @@ export default function NotificationTemplateDetailPage() {
   return (
     <div>
       <PageHeader
+        back={{ href: "/notifications/templates", label: "Templates" }}
         title={data ? data.event_type : "Template"}
         description={
           data
-            ? `${systemQuery.data?.data.name ?? data.external_system_id} · last saved ${new Date(data.updated_at).toLocaleString()}`
+            ? <>
+                <SystemLink id={data.external_system_id} name={data.system_name} className="text-foreground" />
+                {` · last saved ${timeAgo(data.updated_at)}`}
+              </>
             : undefined
         }
         actions={

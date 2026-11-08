@@ -3,19 +3,36 @@
 //
 //   bun run seed:demo            (from the repo root)
 //
-// Writes directly with SQL (faster than going through the API, and it can backdate). Refuses
-// databases whose name doesn't look disposable, and refuses to run twice.
+// Writes directly with SQL (faster than going through the API, and it can backdate).
+// Refuses to run twice, and refuses anything that looks like production.
 
 import { SQL } from "bun";
 
 const dbName = process.env.DB_NAME ?? "";
-if (!/dev|test|demo|local/i.test(dbName)) {
-  console.error(`Refusing to seed "${dbName}": the database name must contain dev, test, demo or local.`);
+const dbHost = process.env.DB_HOST ?? "localhost";
+
+// Where are we? APP_ENV wins, then NODE_ENV. Unset means a dev machine.
+const appEnv  = (process.env.APP_ENV ?? process.env.NODE_ENV ?? "development").toLowerCase();
+const isLocal = ["localhost", "127.0.0.1", "::1", "postgres", "db"].includes(dbHost.toLowerCase());
+const isProd  = appEnv === "production" || appEnv === "prod";
+
+// Production never gets fake data. Elsewhere: a local database is fine; a
+// remote one needs SEED_ALLOW_REMOTE=1, so a dev laptop pointed at a shared
+// server doesn't get seeded by accident.
+if (isProd) {
+  console.error(`Refusing to seed: APP_ENV/NODE_ENV is "${appEnv}". Demo data never goes into production.`);
+  process.exit(1);
+}
+if (!isLocal && process.env.SEED_ALLOW_REMOTE !== "1") {
+  console.error(
+    `Refusing to seed "${dbName}" on ${dbHost}: that isn't a local database. ` +
+      "Set SEED_ALLOW_REMOTE=1 if this server really is disposable.",
+  );
   process.exit(1);
 }
 
 const sql = new SQL({
-  hostname: process.env.DB_HOST ?? "localhost",
+  hostname: dbHost,
   port:     Number(process.env.DB_PORT ?? 5432),
   database: dbName,
   username: process.env.DB_USER ?? "postgres",

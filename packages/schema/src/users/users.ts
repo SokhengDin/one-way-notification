@@ -9,6 +9,8 @@ export class UserRecord extends Schema.Class<UserRecord>("UserRecord")({
   email: Schema.NullOr(Schema.String),
   // always readable: name → email → linked external id → "User 1a2b3c4d"
   display_name: Schema.String,
+  // channels with a usable contact address
+  channels: Schema.Array(channelTypeSchema),
   created_at: Schema.Date,
   updated_at: Schema.NullOr(Schema.Date),
   deleted_at: Schema.NullOr(Schema.Date),

@@ -20,6 +20,7 @@ import {
   NotificationUndeliverable,
 } from "../notifications/notifications.errors";
 import { PaginatedData, PaginationQuery } from "../shared/pagination";
+import { Unauthorized } from "../auth/auth.errors";
 import { ApiResponse } from "./response";
 
 export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
@@ -29,6 +30,9 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
       query: {
         ...PaginationQuery,
         external_system_id: Schema.optional(Uuid),
+        channel: Schema.optional(channelTypeSchema),
+        // matches event type or subject (case-insensitive)
+        q: Schema.optional(Schema.String),
       },
       success: ApiResponse(PaginatedData(NotificationTemplateRecord)),
       error: NotificationRepoError,
@@ -111,7 +115,7 @@ export class NotificationsApiGroup extends HttpApiGroup.make("notifications")
         channels: Schema.optional(Schema.Array(channelTypeSchema)),
       }),
       success: ApiResponse(NotificationRecord),
-      error: [NotificationConflict, NotificationUndeliverable, NotificationRepoError],
+      error: [NotificationConflict, NotificationUndeliverable, Unauthorized, NotificationRepoError],
     }),
     HttpApiEndpoint.get("getNotificationById", "/notification/:id", {
       params: { id: Uuid },

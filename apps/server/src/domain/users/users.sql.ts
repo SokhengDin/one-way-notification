@@ -10,6 +10,7 @@ import {
 } from "@repo/schema";
 import { Effect } from "effect";
 import type { SqlClient } from "effect/unstable/sql/SqlClient";
+import { parsePgArray } from "../notifications/notifications.sql";
 import type { UserRepoService } from "./users.types";
 
 const { toRepoError: toUserRepoError, mapSqlError } = makeMapSqlError<
@@ -17,11 +18,15 @@ const { toRepoError: toUserRepoError, mapSqlError } = makeMapSqlError<
   UserRepoError
 >((fields) => new UserRepoError(fields), "Failed to query users");
 
+// text[] arrives as an array, or as "{a,b}" depending on the driver path
+const toUser = (row: UserRecord) =>
+  new UserRecord({ ...row, channels: parsePgArray(row.channels) as UserRecord["channels"] });
+
 export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
   // Users always come back with their readable label, from the
   // `user_labels` view (name → email → external id → short id).
   const selectUser = (id: string) => sql<UserRecord>`
-    SELECT u.id, l.name, l.email, l.display_name, u.created_at, u.updated_at, u.deleted_at
+    SELECT u.id, l.name, l.email, l.display_name, l.channels, u.created_at, u.updated_at, u.deleted_at
     FROM users u
     JOIN user_labels l ON l.id = u.id
     WHERE u.id = ${id} AND u.deleted_at IS NULL
@@ -39,7 +44,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     `.pipe(mapSqlError("addUser"));
 
     const rows = yield* selectUser(inserted[0]!.id).pipe(mapSqlError("addUser"));
-    return new UserRecord(rows[0]!);
+    return toUser(rows[0]!);
   });
 
   const findUserById: UserRepoService["findUserById"] = Effect.fn(
@@ -48,7 +53,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     const rows = yield* selectUser(id).pipe(mapSqlError("getUserById"));
 
     const row = rows[0];
-    return row ? new UserRecord(row) : null;
+    return row ? toUser(row) : null;
   });
 
   const listUsers: UserRepoService["listUsers"] = Effect.fn(
@@ -59,7 +64,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
     const rows = yield* sql<UserRecord & { readonly total_count: number }>`
-      SELECT u.id, l.name, l.email, l.display_name, u.created_at, u.updated_at, u.deleted_at,
+      SELECT u.id, l.name, l.email, l.display_name, l.channels, u.created_at, u.updated_at, u.deleted_at,
              COUNT(*) OVER()::int AS total_count
       FROM users u
       JOIN user_labels l ON l.id = u.id
@@ -71,7 +76,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     `.pipe(mapSqlError("listUsers"));
 
     return {
-      items: rows.map((row) => new UserRecord(row)),
+      items: rows.map((row) => toUser(row)),
       total: rows[0]?.total_count ?? 0,
       skip,
       limit,
@@ -92,7 +97,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     if (updated.length === 0) return null;
 
     const rows = yield* selectUser(id).pipe(mapSqlError("updateUser"));
-    return rows[0] ? new UserRecord(rows[0]) : null;
+    return rows[0] ? toUser(rows[0]) : null;
   });
 
   const deleteUser: UserRepoService["deleteUser"] = Effect.fn(

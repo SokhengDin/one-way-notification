@@ -8,7 +8,9 @@ import { Button } from "../../../../../components/button";
 import { Card } from "../../../../../components/card";
 import { CheckboxField, TextField } from "../../../../../components/form-field";
 import { PageHeader } from "../../../../../components/page-header";
-import { getUserContact, updateUserContact } from "../../../../../lib/api/users";
+import { getUserById, getUserContact, updateUserContact } from "../../../../../lib/api/users";
+
+const CHANNEL_LABEL: Record<ChannelType, string> = { email: "email", sms: "phone", telegram: "Telegram" };
 
 export default function EditUserContactPage() {
   const params = useParams<{ id: string; channel: ChannelType }>();
@@ -19,6 +21,9 @@ export default function EditUserContactPage() {
     queryKey: ["user-contact", userId, channel],
     queryFn: () => getUserContact(userId, channel),
   });
+
+  const userQuery = useQuery({ queryKey: ["user", userId], queryFn: () => getUserById(userId) });
+  const userName  = userQuery.data?.data.display_name;
 
   const [address, setAddress] = useState("");
   const [linked, setLinked] = useState(false);
@@ -44,10 +49,14 @@ export default function EditUserContactPage() {
 
   return (
     <div>
-      <PageHeader title={`Edit ${channel} contact`} />
+      <PageHeader
+        back={{ href: `/users/${userId}`, label: userName ?? "User" }}
+        title={`Edit ${CHANNEL_LABEL[channel] ?? channel} contact`}
+        description={userName ? `For ${userName}` : undefined}
+      />
       <Card>
         <form
-          className="flex flex-col gap-4"
+          className="flex max-w-xl flex-col gap-4"
           onSubmit={(event) => {
             event.preventDefault();
             mutation.mutate();

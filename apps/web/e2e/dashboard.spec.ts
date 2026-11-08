@@ -3,7 +3,7 @@
 // Tests run in order and share one external system created by the first.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { resolve } from "node:path";
-import { API_URL } from "../playwright.config";
+import { ADMIN, API_URL } from "../playwright.config";
 
 test.describe.configure({ mode: "serial" });
 
@@ -358,7 +358,7 @@ test.describe("templates", () => {
     await expect(page.getByRole("link", { name: "otp.requested" })).toBeVisible();
 
     const id = templatePath.split("/").pop();
-    expect((await request.get(`${API_URL}/api/notification-template/${id}`)).status()).toBe(404);
+    expect((await request.get(`/api/proxy/api/notification-template/${id}`)).status()).toBe(404);
 
     // the old URL now shows a clear not-found state
     await page.goto(templatePath);
@@ -419,7 +419,7 @@ test.describe("providers", () => {
     await expect(page.getByTestId("secret-password")).toContainText("Saved");
 
     const id   = providerPath.split("/").pop();
-    const body = await (await request.get(`${API_URL}/api/channel-provider/${id}`)).json();
+    const body = await (await request.get(`/api/proxy/api/channel-provider/${id}`)).json();
     expect(body.data).toMatchObject({ secret_keys: ["password"], config: { host: "mail.acme-e2e.test", port: 465, security: "tls" } });
     expect(JSON.stringify(body)).not.toContain("smtp-secret-e2e");
   });
@@ -462,7 +462,7 @@ test.describe("providers", () => {
 test.describe("overview dashboard", () => {
   // the e2e API is started with deterministic demo traffic (db/seed-demo.ts)
   const statsFor = async (request: import("@playwright/test").APIRequestContext, days: number, timezone: string) =>
-    (await (await request.get(`${API_URL}/api/stats/overview?days=${days}&timezone=${encodeURIComponent(timezone)}`)).json()).data;
+    (await (await request.get(`/api/proxy/api/stats/overview?days=${days}&timezone=${encodeURIComponent(timezone)}`)).json()).data;
 
   test("tiles, chart and tables show the API's numbers", async ({ page, request }) => {
     await page.goto("/");
@@ -525,6 +525,32 @@ test.describe("overview dashboard", () => {
   });
 });
 
+test.describe("sign-in", () => {
+  // a fresh browser: no session cookie
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("pages send you to sign in, and back afterwards", async ({ page }) => {
+    await page.goto("/deliveries?status=failed");
+    await expect(page).toHaveURL(/\/login\?next=%2Fdeliveries%3Fstatus%3Dfailed$/);
+    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+
+    await page.getByLabel("Email").fill(ADMIN.email);
+    await page.getByLabel("Password", { exact: true }).fill("not the password");
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("Invalid email or password")).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
+
+    await page.getByLabel("Password", { exact: true }).fill(ADMIN.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page).toHaveURL(/\/deliveries\?status=failed$/);
+    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  });
+
+  test("the API proxy refuses requests without a session", async ({ request }) => {
+    expect((await request.get("/api/proxy/api/user")).status()).toBe(401);
+  });
+});
+
 test.describe("names instead of ids", () => {
   test("a user is created with a name and shown by it everywhere", async ({ page }) => {
     const name = `Dara E2E ${Date.now()}`;
@@ -537,6 +563,19 @@ test.describe("names instead of ids", () => {
     await page.goto("/users");
     await page.getByLabel("Search users").fill(name);
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible();
+  });
+
+  test("clicking anywhere on a row opens it", async ({ page }) => {
+    await page.goto("/notifications/templates");
+    // a loaded row (not the loading skeleton)
+    const row = page.locator("main table tbody tr").filter({ has: page.getByRole("link") }).first();
+    // the channel badge isn't a link: the row itself navigates
+    await row.locator("td").nth(1).click();
+    await expect(page).toHaveURL(/\/notifications\/templates\/[0-9a-f-]{36}$/);
+
+    await page.goto("/users");
+    await page.locator("main table tbody tr").filter({ has: page.getByRole("link") }).first().locator("td").last().click();
+    await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}$/);
   });
 
   test("lists show user and system names, not UUIDs", async ({ page }) => {

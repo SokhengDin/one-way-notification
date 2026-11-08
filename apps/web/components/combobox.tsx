@@ -33,6 +33,8 @@ interface ComboboxProps {
   readonly isLoading?: boolean;
   readonly error?: string;
   readonly hint?: string;
+  /** label for screen readers only */
+  readonly hideLabel?: boolean;
 }
 
 export function Combobox({
@@ -47,6 +49,7 @@ export function Combobox({
   isLoading,
   error,
   hint,
+  hideLabel,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value);
@@ -54,7 +57,7 @@ export function Combobox({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {label && <Label htmlFor={fieldId}>{label}</Label>}
+      {label && <Label htmlFor={fieldId} className={hideLabel ? "sr-only" : undefined}>{label}</Label>}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={

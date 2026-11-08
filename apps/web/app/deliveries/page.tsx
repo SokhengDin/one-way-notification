@@ -218,6 +218,7 @@ function Deliveries() {
             columns={columns}
             data={deliveriesQuery.data?.data}
             rowKey={(row) => row.id}
+            rowHref={(row) => `/deliveries/${row.id}`}
             isLoading={deliveriesQuery.isLoading}
             error={deliveriesQuery.error}
             emptyMessage={filtered ? "No deliveries match these filters." : "No deliveries yet. Send a notification and it shows up here."}

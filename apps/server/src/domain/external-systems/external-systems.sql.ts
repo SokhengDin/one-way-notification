@@ -23,12 +23,26 @@ export function makeSqlExternalSystemsRepo(
 ): ExternalSystemRepoService {
   // ---------- external_systems ----------
 
+  // with a few counts, so the systems list says something useful
+  const SYSTEM_COLUMNS = sql.literal(`
+    id, name, api_key, created_at, updated_at, deleted_at,
+    (SELECT count(*)::int FROM notification_templates t
+      WHERE t.external_system_id = external_systems.id AND t.deleted_at IS NULL)              AS template_count,
+    (SELECT count(*)::int FROM external_user_links l
+      WHERE l.external_system_id = external_systems.id AND l.deleted_at IS NULL)              AS user_count,
+    (SELECT count(*)::int FROM notifications n
+      WHERE n.external_system_id = external_systems.id AND n.deleted_at IS NULL
+        AND n.created_at >= now() - interval '30 days')                                       AS notifications_30d,
+    (SELECT max(n.created_at) FROM notifications n
+      WHERE n.external_system_id = external_systems.id AND n.deleted_at IS NULL)              AS last_notification_at
+  `);
+
   const addExternalSystem: ExternalSystemRepoService["addExternalSystem"] =
     Effect.fn("ExternalSystemsRepo.addExternalSystem")(function* (input) {
       const rows = yield* sql<ExternalSystemRecord>`
         INSERT INTO external_systems (name, api_key)
         VALUES (${input.name}, ${input.api_key})
-        RETURNING id, name, api_key, created_at, updated_at, deleted_at
+        RETURNING ${SYSTEM_COLUMNS}
       `.pipe(
         Effect.catchReason(
           "SqlError",
@@ -48,7 +62,7 @@ export function makeSqlExternalSystemsRepo(
   const findExternalSystemById: ExternalSystemRepoService["findExternalSystemById"] =
     Effect.fn("ExternalSystemsRepo.findExternalSystemById")(function* (id) {
       const rows = yield* sql<ExternalSystemRecord>`
-        SELECT id, name, api_key, created_at, updated_at, deleted_at
+        SELECT ${SYSTEM_COLUMNS}
         FROM external_systems
         WHERE id = ${id} AND deleted_at IS NULL
       `.pipe(mapSqlError("findExternalSystemById"));
@@ -64,7 +78,7 @@ export function makeSqlExternalSystemsRepo(
       const rows = yield* sql<
         ExternalSystemRecord & { readonly total_count: number }
       >`
-        SELECT id, name, api_key, created_at, updated_at, deleted_at,
+        SELECT ${SYSTEM_COLUMNS},
                COUNT(*) OVER()::int AS total_count
         FROM external_systems
         WHERE deleted_at IS NULL
@@ -93,7 +107,7 @@ export function makeSqlExternalSystemsRepo(
           api_key = COALESCE(${input.api_key ?? null}, api_key),
           updated_at = now()
         WHERE id = ${id} AND deleted_at IS NULL
-        RETURNING id, name, api_key, created_at, updated_at, deleted_at
+        RETURNING ${SYSTEM_COLUMNS}
       `.pipe(
         Effect.catchReason(
           "SqlError",

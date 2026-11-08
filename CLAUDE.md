@@ -254,11 +254,27 @@ planned file API plugs in as another `AssetSource` there.
   breaker: 3 provider-side failures in a row → cooldown (30 s doubling, max
   15 min); recipient errors don't count. Operator API: list/filter, detail
   with attempts, retry, cancel, bulk retry, queue stats, process-now.
+- `auth` — dashboard sign-in. `admins` (Argon2id via `Bun.password`, lock
+  after 5 failures for 15 min) and `admin_sessions` (only a SHA-256 of the
+  `own_…` bearer token is stored, 12 h lifetime). A global
+  `HttpRouter.middleware` (`auth.middleware.ts`) requires a session on every
+  `/api` route except health, login, public asset files, and
+  `POST /api/notification` sent with `X-Api-Key` (the handler checks the key
+  belongs to the payload's external system). First admin from
+  `ADMIN_EMAIL`/`ADMIN_PASSWORD`, or `bun run admin:create -- <email>`.
+  Tests sign every request in as `TEST_ADMIN` (`test/support.ts`); pass
+  `{ token: null }` to `api()` to go anonymous.
 - `providers` — configuration with encrypted credentials (see above).
 - `stats` — overview statistics (see above).
 - `assets` — complete (see above).
 - `apps/web` — admin dashboard covering all domains, wired to the API via
-  `@repo/schema`'s `HttpApiClient`. Overview is a statistics dashboard;
+  `@repo/schema`'s `HttpApiClient`. It never calls the API from the browser:
+  `/login` posts to `app/api/auth/login`, which seals the API token into an
+  HttpOnly cookie (`lib/server/session.ts`, `SESSION_SECRET`); every API call
+  goes through `app/api/proxy/[...path]` (adds the bearer, server-side
+  `NOTIFY_API_URL`); `proxy.ts` redirects pages to `/login` without a session.
+  Lists use `DataTable`'s `rowHref` (whole row opens the record) and never
+  show UUIDs. Overview is a statistics dashboard;
   template pages have the CodeMirror editor + live preview; providers have
   catalog-driven config forms; external systems have a brand-assets panel.
   No auth in v1.

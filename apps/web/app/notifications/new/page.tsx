@@ -65,6 +65,7 @@ export default function NewNotificationPage() {
   return (
     <div>
       <PageHeader
+        back={{ href: "/notifications", label: "Notifications" }}
         title="New notification"
         description="Send an event the way an external system would. Useful for testing templates and providers end to end."
       />

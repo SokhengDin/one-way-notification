@@ -66,15 +66,26 @@ export interface ApiResponse<T = any> {
   readonly bytes:   Uint8Array;
 }
 
+export interface ApiOptions {
+  /** bearer token; defaults to the test administrator's session, null sends none */
+  readonly token?:   string | null;
+  readonly headers?: Record<string, string>;
+}
+
 export async function api<T = any>(
-  method: string,
-  path:   string,
-  body?:  unknown,
+  method:   string,
+  path:     string,
+  body?:    unknown,
+  options:  ApiOptions = {},
 ): Promise<ApiResponse<T>> {
+  const token   = options.token === undefined ? await adminToken() : options.token;
+  const headers: Record<string, string> = { ...(options.headers ?? {}) };
+  if (body !== undefined) headers["content-type"] = "application/json";
+  if (token) headers.authorization = `Bearer ${token}`;
   const response = await handler(
     new Request(`http://localhost${path}`, {
       method,
-      headers: body === undefined ? {} : { "content-type": "application/json" },
+      headers,
       body:    body === undefined ? undefined : JSON.stringify(body),
     }),
   );
@@ -91,6 +102,29 @@ const sql = new SQL({
   username: process.env.DB_USER ?? "postgres",
   password: process.env.DB_PASS ?? "postgres",
 });
+
+// ---------- the test administrator ----------
+//
+// Every request is signed in as this admin unless a test says otherwise.
+// resetDb() leaves admins alone, so the session lives for the whole run.
+
+export const TEST_ADMIN = { email: "admin@test.local", name: "Test Admin", password: "correct horse battery staple" };
+
+let tokenPromise: Promise<string> | null = null;
+
+export function adminToken(): Promise<string> {
+  tokenPromise ??= (async () => {
+    const [existing] = await sql`SELECT id FROM admins WHERE lower(email) = lower(${TEST_ADMIN.email}) AND deleted_at IS NULL`;
+    if (!existing) {
+      const hash = await Bun.password.hash(TEST_ADMIN.password);
+      await sql`INSERT INTO admins (email, name, password_hash) VALUES (${TEST_ADMIN.email}, ${TEST_ADMIN.name}, ${hash})`;
+    }
+    const res = await api("POST", "/api/auth/login", { email: TEST_ADMIN.email, password: TEST_ADMIN.password }, { token: null });
+    if (res.status !== 200) throw new Error(`test admin login failed: ${res.status} ${JSON.stringify(res.json)}`);
+    return res.json.data.token as string;
+  })();
+  return tokenPromise;
+}
 
 /** Wipe every table between tests. */
 export async function resetDb() {

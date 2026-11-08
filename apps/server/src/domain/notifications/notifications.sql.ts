@@ -34,6 +34,13 @@ export function makeSqlNotificationRepo(
 ): NotificationRepoService {
   // ---------- notification_templates ----------
 
+  // system_name rides along so every template shape is readable as-is
+  const TEMPLATE_COLUMNS = sql.literal(
+    "id, external_system_id, " +
+      "(SELECT s.name FROM external_systems s WHERE s.id = external_system_id) AS system_name, " +
+      "event_type, channel, template, subject, created_at, updated_at, deleted_at",
+  );
+
   const addNotificationTemplate: NotificationRepoService["addNotificationTemplate"] =
     Effect.fn("NotificationsRepo.addNotificationTemplate")(function* (
       input,
@@ -41,7 +48,7 @@ export function makeSqlNotificationRepo(
       const rows = yield* sql<NotificationTemplateRecord>`
         INSERT INTO notification_templates (external_system_id, event_type, channel, template, subject)
         VALUES (${input.external_system_id}, ${input.event_type}, ${input.channel}, ${input.template}, ${input.subject})
-        RETURNING id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at
+        RETURNING ${TEMPLATE_COLUMNS}
       `.pipe(
         Effect.catchReason(
           "SqlError",
@@ -63,7 +70,7 @@ export function makeSqlNotificationRepo(
       id,
     ) {
       const rows = yield* sql<NotificationTemplateRecord>`
-        SELECT id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at
+        SELECT ${TEMPLATE_COLUMNS}
         FROM notification_templates
         WHERE id = ${id} AND deleted_at IS NULL
       `.pipe(mapSqlError("findNotificationTemplateById"));
@@ -78,16 +85,21 @@ export function makeSqlNotificationRepo(
     ) {
       const { skip, limit } = normalizePagination(input);
       const externalSystemId = input.external_system_id ?? null;
+      const channel          = input.channel ?? null;
+      const q                = input.q?.trim() || null;
+      const pattern          = q === null ? null : `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
       const rows = yield* sql<
         NotificationTemplateRecord & { readonly total_count: number }
       >`
-        SELECT id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at,
+        SELECT ${TEMPLATE_COLUMNS},
                COUNT(*) OVER()::int AS total_count
         FROM notification_templates
         WHERE deleted_at IS NULL
           AND (${externalSystemId}::uuid IS NULL OR external_system_id = ${externalSystemId})
-        ORDER BY created_at DESC
+          AND (${channel}::text IS NULL OR channel::text = ${channel}::text)
+          AND (${pattern}::text IS NULL OR event_type ILIKE ${pattern}::text OR subject ILIKE ${pattern}::text)
+        ORDER BY event_type, channel, created_at DESC
         LIMIT ${limit} OFFSET ${skip}
       `.pipe(mapSqlError("listNotificationTemplates"));
 
@@ -114,7 +126,7 @@ export function makeSqlNotificationRepo(
                          ELSE subject END,
           updated_at = now()
         WHERE id = ${id} AND deleted_at IS NULL
-        RETURNING id, external_system_id, event_type, channel, template, subject, created_at, updated_at, deleted_at
+        RETURNING ${TEMPLATE_COLUMNS}
       `.pipe(mapSqlError("updateNotificationTemplate"));
 
       const row = rows[0];

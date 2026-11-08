@@ -41,9 +41,10 @@ export default function DeliveryPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        back={{ href: "/deliveries", label: "Deliveries" }}
         title={`${delivery.event_type} → ${delivery.user_display_name}`}
         description={`${delivery.system_name} · created ${formatDateTime(delivery.created_at)}`}
-        actions={<DeliveryActions delivery={delivery} />}
+        actions={<><IdChip id={delivery.id} /><DeliveryActions delivery={delivery} /></>}
       />
 
       <div className="grid gap-6 xl:grid-cols-3">
@@ -79,8 +80,6 @@ export default function DeliveryPage() {
 
             <Outcome delivery={delivery} />
 
-            <dt className="text-muted-foreground">Id</dt>
-            <dd><IdChip id={delivery.id} /></dd>
           </dl>
 
           {delivery.last_error && (

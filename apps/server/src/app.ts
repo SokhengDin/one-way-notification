@@ -16,6 +16,10 @@ import { StatsApiHandlers } from "./domain/stats/stats.http";
 import { DeliveriesApiHandlers } from "./domain/delivery/delivery.http";
 import { DeliveryWorkerLive } from "./domain/delivery/delivery.worker";
 import { SenderRegistry } from "./domain/delivery/senders";
+import { AuthApiHandlers } from "./domain/auth/auth.http";
+import { AuthMiddlewareLive } from "./domain/auth/auth.middleware";
+import { Auth } from "./domain/auth/auth";
+import { AdminBootstrapLive } from "./domain/auth/auth.bootstrap";
 
 const SwaggerLive = HttpApiSwagger.layer(Api, { path: "/docs" });
 
@@ -33,15 +37,20 @@ export const makeAppRoutes = (senders: Layer.Layer<SenderRegistry>) => {
       AssetsApiHandlers,
       StatsApiHandlers,
       DeliveriesApiHandlers,
+      AuthApiHandlers,
       SystemApiHandlers,
     ]),
     Layer.provide(senders),
     Layer.provide(PgLive),
   );
-  return Layer.mergeAll(ApiLive, SwaggerLive);
+  const AuthLive = AuthMiddlewareLive.pipe(Layer.provide(Auth.layer), Layer.provide(PgLive));
+  return Layer.mergeAll(ApiLive, SwaggerLive, AuthLive);
 };
 
 export const AppRoutes = makeAppRoutes(SenderRegistry.live);
+
+/** Creates the first administrator from ADMIN_EMAIL / ADMIN_PASSWORD. */
+export const AdminBootstrap = AdminBootstrapLive.pipe(Layer.provide(Auth.layer), Layer.provide(PgLive));
 
 /** The background delivery worker (not started by tests). */
 export const WorkerLive = DeliveryWorkerLive.pipe(

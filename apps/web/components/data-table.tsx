@@ -1,4 +1,7 @@
+"use client";
+
 import { AlertCircle, Inbox } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "./button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -30,8 +33,15 @@ interface DataTableProps<T> {
   readonly isLoading?: boolean;
   readonly error?: unknown;
   readonly emptyMessage?: string;
+  /** shown under the empty message, e.g. a "Create …" button */
+  readonly emptyAction?: React.ReactNode;
   readonly onPageChange?: (skip: number, limit: number) => void;
+  /** makes the whole row open this page (click, Enter; ⌘/Ctrl-click opens a new tab) */
+  readonly rowHref?: (row: T) => string;
 }
+
+// clicks on these inside a row do their own thing instead of opening the row
+const INTERACTIVE = "a, button, input, select, textarea, label, [role=button], [role=checkbox], [role=combobox], [data-row-ignore]";
 
 export function DataTable<T>({
   columns,
@@ -40,8 +50,16 @@ export function DataTable<T>({
   isLoading,
   error,
   emptyMessage = "No records found.",
+  emptyAction,
   onPageChange,
+  rowHref,
 }: DataTableProps<T>) {
+  const router = useRouter();
+
+  const open = (href: string, newTab: boolean) => {
+    if (newTab) window.open(href, "_blank", "noopener");
+    else router.push(href);
+  };
   if (isLoading) {
     return (
       <div className="overflow-x-auto rounded-lg border">
@@ -85,6 +103,7 @@ export function DataTable<T>({
       <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-center">
         <Inbox className="size-6 text-muted-foreground" />
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        {emptyAction && <div className="mt-2">{emptyAction}</div>}
       </div>
     );
   }
@@ -107,15 +126,33 @@ export function DataTable<T>({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {items.map((row) => (
-              <TableRow key={rowKey(row)}>
+            {items.map((row) => {
+              const href = rowHref?.(row);
+              return (
+              <TableRow
+                key={rowKey(row)}
+                className={href ? "cursor-pointer focus-visible:bg-muted/60 focus-visible:outline-none" : undefined}
+                tabIndex={href ? 0 : undefined}
+                onClick={href ? (event) => {
+                  if ((event.target as HTMLElement).closest(INTERACTIVE)) return;
+                  if (window.getSelection()?.toString()) return; // selecting text, not opening
+                  open(href, event.metaKey || event.ctrlKey);
+                } : undefined}
+                onAuxClick={href ? (event) => {
+                  if (event.button === 1 && !(event.target as HTMLElement).closest(INTERACTIVE)) open(href, true);
+                } : undefined}
+                onKeyDown={href ? (event) => {
+                  if (event.key === "Enter" && event.target === event.currentTarget) open(href, event.metaKey || event.ctrlKey);
+                } : undefined}
+              >
                 {columns.map((column) => (
                   <TableCell key={column.header} className={column.className}>
                     {column.cell(row)}
                   </TableCell>
                 ))}
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </div>

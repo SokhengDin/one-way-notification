@@ -6,9 +6,11 @@ import {
   NotificationTemplateNotFound,
   NotificationUndeliverable,
   RenderedTemplate,
+  Unauthorized,
   type ChannelType,
 } from "@repo/schema";
 import { Context, Effect, Layer } from "effect";
+import { timingSafeEqual } from "node:crypto";
 import { SqlClient } from "effect/unstable/sql/SqlClient";
 import { AppConfigLive, AppConfigService } from "../../config/config";
 import { AssetsRepo } from "../assets/assets";
@@ -205,6 +207,22 @@ export class Notifications extends Context.Service<
           }
         });
 
+      const verifySystemApiKey: NotificationsService["verifySystemApiKey"] =
+        Effect.fn("Notifications.verifySystemApiKey")(function* (externalSystemId, apiKey) {
+          const system = yield* externalSystems.findExternalSystemById(externalSystemId).pipe(
+            Effect.mapError((cause) => new NotificationRepoError({
+              message: "Failed to check the API key", operation: "addNotification", cause,
+            })),
+          );
+          const expected = Buffer.from(system?.api_key ?? "", "utf8");
+          const given    = Buffer.from(apiKey, "utf8");
+          // constant-time compare; an unknown system fails the same way
+          const valid = system !== null && expected.length === given.length && timingSafeEqual(expected, given);
+          if (!valid) {
+            return yield* new Unauthorized({ message: "X-Api-Key is not valid for this external system" });
+          }
+        });
+
       const getNotificationById: NotificationsService["getNotificationById"] =
         Effect.fn("Notifications.getNotificationById")(function* (id) {
           const notification = yield* repo.findNotificationById(id);
@@ -255,6 +273,7 @@ export class Notifications extends Context.Service<
         previewNotificationTemplate,
         deleteNotificationTemplate,
         addNotification,
+        verifySystemApiKey,
         getNotificationById,
         listNotifications,
         listNotificationDeliveries,

@@ -26,3 +26,6 @@ export * from "./api/stats";
 export * from "./deliveries/deliveries";
 export * from "./deliveries/deliveries.errors";
 export * from "./api/deliveries";
+export * from "./auth/auth";
+export * from "./auth/auth.errors";
+export * from "./api/auth";

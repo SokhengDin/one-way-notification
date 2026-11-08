@@ -17,7 +17,12 @@ interface PickerProps {
   readonly placeholder?: string;
   readonly hint?:        string;
   readonly error?:       string;
+  readonly hideLabel?:   boolean;
+  /** offer an "All …" choice that maps to "" (for filters) */
+  readonly allLabel?:    string;
 }
+
+const ALL = "__all__";
 
 function useRemembered(options: ReadonlyArray<ComboboxOption>, value: string) {
   const [remembered, setRemembered] = useState<ComboboxOption | null>(null);
@@ -28,7 +33,7 @@ function useRemembered(options: ReadonlyArray<ComboboxOption>, value: string) {
   return { merged, remember: setRemembered };
 }
 
-export function UserPicker({ label = "User", value, onChange, placeholder = "Search by name or email…", hint, error }: PickerProps) {
+export function UserPicker({ label = "User", value, onChange, placeholder = "Search by name or email…", hint, error, hideLabel }: PickerProps) {
   const [search, setSearch] = useState("");
   const query = useQuery({
     queryKey: ["users", { q: search, limit: 20 }],
@@ -58,24 +63,29 @@ export function UserPicker({ label = "User", value, onChange, placeholder = "Sea
       isLoading={query.isLoading}
       hint={hint}
       error={error}
+      hideLabel={hideLabel}
     />
   );
 }
 
-export function SystemPicker({ label = "External system", value, onChange, placeholder = "Select an external system…", hint, error }: PickerProps) {
+export function SystemPicker({ label = "External system", value, onChange, placeholder = "Select an external system…", hint, error, hideLabel, allLabel }: PickerProps) {
   const [search, setSearch] = useState("");
   const query = useQuery({
     queryKey: ["external-systems", { name: search, limit: 50 }],
     queryFn:  () => listExternalSystems({ skip: 0, limit: 50, name: search || undefined }),
   });
-  const options = (query.data?.data.items ?? []).map((system) => ({ value: system.id, label: system.name }));
+  const options = [
+    ...(allLabel ? [{ value: ALL, label: allLabel }] : []),
+    ...(query.data?.data.items ?? []).map((system) => ({ value: system.id, label: system.name })),
+  ];
   const { merged, remember } = useRemembered(options, value);
 
   return (
     <Combobox
       label={label}
-      value={value}
+      value={value === "" && allLabel ? ALL : value}
       onValueChange={(id) => {
+        if (id === ALL) return onChange("", allLabel ?? "");
         const option = merged.find((candidate) => candidate.value === id);
         if (option) remember(option);
         onChange(id, option?.label ?? "");
@@ -88,6 +98,7 @@ export function SystemPicker({ label = "External system", value, onChange, place
       isLoading={query.isLoading}
       hint={hint}
       error={error}
+      hideLabel={hideLabel}
     />
   );
 }

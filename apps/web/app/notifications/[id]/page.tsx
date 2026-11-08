@@ -79,6 +79,8 @@ export default function NotificationDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        back={{ href: "/notifications", label: "Notifications" }}
+        actions={notification && <IdChip id={notification.id} />}
         title={notification ? notification.event_type : "Notification"}
         description={notification ? `Sent to ${notification.user_display_name} by ${notification.system_name} · ${formatDateTime(notification.created_at)}` : undefined}
       />
@@ -107,9 +109,6 @@ export default function NotificationDetailPage() {
 
             <dt className="text-muted-foreground">Idempotency key</dt>
             <dd className="font-mono text-xs">{notification.idempotency_key ?? <span className="font-sans text-muted-foreground">—</span>}</dd>
-
-            <dt className="text-muted-foreground">Id</dt>
-            <dd><IdChip id={notification.id} /></dd>
           </dl>
           <details className="mt-4">
             <summary className="cursor-pointer text-xs text-muted-foreground">Payload</summary>
@@ -125,6 +124,7 @@ export default function NotificationDetailPage() {
           columns={deliveryColumns}
           data={deliveriesQuery.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/deliveries/${row.id}`}
           isLoading={deliveriesQuery.isLoading}
           error={deliveriesQuery.error}
           emptyMessage="No deliveries were planned for this notification."

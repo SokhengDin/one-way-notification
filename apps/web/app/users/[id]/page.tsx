@@ -7,18 +7,11 @@ import { useState } from "react";
 import { CHANNEL_TYPES, type ChannelType, type UserContactRecord, type UserPreferenceRecord } from "@repo/schema";
 import { Button, LinkButton } from "../../../components/button";
 import { Card } from "../../../components/card";
-import { CheckboxField, SelectField, TextField } from "../../../components/form-field";
+import { TextField } from "../../../components/form-field";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, type DataTableColumn } from "../../../components/data-table";
 import { PageHeader } from "../../../components/page-header";
 import { BooleanBadge, ChannelBadge } from "../../../components/status-badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { toast } from "sonner";
 import { ConfirmButton } from "../../../components/confirm-button";
 import { SystemLink } from "../../../components/entity-links";
@@ -74,11 +67,9 @@ export default function UserDetailPage() {
     queryFn: () => listExternalUserLinksByUser(userId, { skip: 0, limit: 100 }),
   });
 
-  const [preferenceChannel, setPreferenceChannel] = useState<ChannelType>("email");
-  const [preferenceEnabled, setPreferenceEnabled] = useState(true);
 
   const setPreferenceMutation = useMutation({
-    mutationFn: () => setUserPreference(userId, { channel: preferenceChannel, enabled: preferenceEnabled }),
+    mutationFn: (input: { channel: ChannelType; enabled: boolean }) => setUserPreference(userId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user-preferences", userId] }),
   });
 
@@ -112,6 +103,7 @@ export default function UserDetailPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
+        back={{ href: "/users", label: "Users" }}
         title={user ? user.display_name : "User"}
         description={user ? `${user.email ?? "No email"} · created ${timeAgo(user.created_at)}` : undefined}
         actions={
@@ -147,7 +139,7 @@ export default function UserDetailPage() {
               {renameMutation.isPending ? "Saving…" : "Save name"}
             </Button>
             <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-              <IdChip id={user.id} label="Id" />
+              <IdChip id={user.id} />
             </div>
           </form>
         </Card>
@@ -161,62 +153,43 @@ export default function UserDetailPage() {
           columns={contactColumns}
           data={contactsQuery.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/users/${row.user_id}/contacts/${row.channel}`}
           isLoading={contactsQuery.isLoading}
           error={contactsQuery.error}
           emptyMessage="No contacts yet."
         />
       </Card>
 
-      <Card title="Preferences">
-        <div className="flex flex-col gap-4">
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Channel</TableHead>
-                  <TableHead>Enabled</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {CHANNEL_TYPES.map((channel) => {
-                  const preference = preferenceByChannel.get(channel) as UserPreferenceRecord | undefined;
-                  return (
-                    <TableRow key={channel}>
-                      <TableCell>
-                        <ChannelBadge channel={channel} />
-                      </TableCell>
-                      <TableCell>
-                        {preference ? (
-                          <BooleanBadge value={preference.enabled} />
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Not set</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex items-end gap-3 border-t pt-4">
-            <div className="w-40">
-              <SelectField
-                label="Channel"
-                value={preferenceChannel}
-                onValueChange={(value) => setPreferenceChannel(value as ChannelType)}
-                options={CHANNEL_TYPES.map((channel) => ({ value: channel, label: { email: "Email", sms: "SMS", telegram: "Telegram" }[channel] }))}
-              />
-            </div>
-            <CheckboxField label="Enabled" checked={preferenceEnabled} onCheckedChange={setPreferenceEnabled} />
-            <Button
-              variant="secondary"
-              onClick={() => setPreferenceMutation.mutate()}
-              disabled={setPreferenceMutation.isPending}
-            >
-              {setPreferenceMutation.isPending ? "Saving…" : "Set preference"}
-            </Button>
-          </div>
-        </div>
+      <Card title="Notification preferences">
+        <p className="mb-3 text-sm text-muted-foreground">
+          Turn a channel off and its deliveries are skipped for this user, even when a template exists.
+        </p>
+        <ul className="divide-y rounded-lg border">
+          {CHANNEL_TYPES.map((channel) => {
+            const preference = preferenceByChannel.get(channel) as UserPreferenceRecord | undefined;
+            const enabled    = preference?.enabled ?? true;
+            const contact    = (contactsQuery.data?.data.items ?? []).find((item) => item.channel === channel);
+            return (
+              <li key={channel} className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <ChannelBadge channel={channel} />
+                  <span className="text-sm text-muted-foreground">
+                    {contact?.address ?? "no contact"}
+                  </span>
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={enabled}
+                    disabled={setPreferenceMutation.isPending}
+                    onCheckedChange={(next) => setPreferenceMutation.mutate({ channel, enabled: next === true })}
+                    aria-label={`Receive ${channel} notifications`}
+                  />
+                  {enabled ? "On" : "Off"}
+                </label>
+              </li>
+            );
+          })}
+        </ul>
       </Card>
 
       <Card title="Linked external systems">
@@ -230,6 +203,7 @@ export default function UserDetailPage() {
           ]}
           data={linksQuery.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/external-systems/${row.external_system_id}`}
           isLoading={linksQuery.isLoading}
           error={linksQuery.error}
           emptyMessage="No linked external systems."
@@ -256,6 +230,7 @@ export default function UserDetailPage() {
           ]}
           data={notificationsQuery.data?.data}
           rowKey={(row) => row.id}
+          rowHref={(row) => `/notifications/${row.id}`}
           isLoading={notificationsQuery.isLoading}
           error={notificationsQuery.error}
           emptyMessage="Nothing sent to this user yet."

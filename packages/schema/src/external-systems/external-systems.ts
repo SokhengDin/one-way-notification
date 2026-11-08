@@ -6,6 +6,11 @@ export class ExternalSystemRecord extends Schema.Class<ExternalSystemRecord>(
   id: Schema.String,
   name: Schema.String,
   api_key: Schema.String,
+  // activity, for the list
+  template_count: Schema.Int,
+  user_count: Schema.Int,
+  notifications_30d: Schema.Int,
+  last_notification_at: Schema.NullOr(Schema.Date),
   created_at: Schema.Date,
   updated_at: Schema.NullOr(Schema.Date),
   deleted_at: Schema.NullOr(Schema.Date),

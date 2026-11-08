@@ -36,6 +36,7 @@ export default function NewProviderPage() {
   return (
     <div>
       <PageHeader
+        back={{ href: "/providers", label: "Providers" }}
         title="New provider"
         description="Connect an email service, your own domain over SMTP, an SMS gateway or a Telegram bot."
       />
