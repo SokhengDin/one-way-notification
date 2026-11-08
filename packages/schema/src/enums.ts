@@ -10,9 +10,15 @@ export const DELIVERY_STATUSES = [
   "failed",
   "retrying",
   "skipped",
+  "cancelled",
 ] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 export const deliveryStatusSchema = Schema.Literals(DELIVERY_STATUSES);
+
+// still waiting to go out: the worker will pick these up
+export const ACTIVE_DELIVERY_STATUSES: ReadonlyArray<DeliveryStatus> = ["pending", "retrying"];
+// done, one way or another
+export const FINAL_DELIVERY_STATUSES: ReadonlyArray<DeliveryStatus> = ["sent", "failed", "skipped", "cancelled"];
 
 // Brand assets an external system can upload. `email_header` is a wide banner
 // used at the top of email layouts; it falls back to `logo` when absent.

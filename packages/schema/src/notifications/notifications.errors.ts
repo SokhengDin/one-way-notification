@@ -13,6 +13,7 @@ export const NotificationRepoOperation = Schema.Literals([
   "listNotifications",
   // notification_deliveries
   "addNotificationDelivery",
+  "planDeliveries",
   "listNotificationDeliveries",
   "updateNotificationDeliveryStatus",
   // rendering: loading the external system + its brand assets
@@ -80,6 +81,16 @@ export class NotificationTemplateInvalid extends Schema.TaggedErrorClass<Notific
   {
     message: Schema.String,
     issues:  Schema.optionalKey(Schema.Array(Schema.String)),
+  },
+  { httpApiStatus: 422 },
+) {}
+
+// The notification can't be accepted: the user doesn't exist, or no channel
+// has a template for this event, so nothing could ever be sent.
+export class NotificationUndeliverable extends Schema.TaggedErrorClass<NotificationUndeliverable>()(
+  "NotificationUndeliverable",
+  {
+    message: Schema.String,
   },
   { httpApiStatus: 422 },
 ) {}

@@ -2,13 +2,17 @@ import {
   ChannelProviderNotFound,
   ProviderInvalid,
   ProviderSecretsUnavailable,
+  ProviderTestResult,
   providerKindSpec,
   validateProviderConfig,
+  type ChannelType,
   type ProviderKindSpec,
 } from "@repo/schema";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql/SqlClient";
 import { AppConfigLive, AppConfigService } from "../../config/config";
+import { SenderRegistry, type OutboundMessage } from "../delivery/senders";
+import { validateRecipient } from "../delivery/recipients";
 import { decryptSecrets, deriveKey, encryptSecrets, type SecretValues } from "./provider-secrets";
 import { makeSqlProvidersRepo } from "./providers.sql";
 import type {
@@ -61,6 +65,28 @@ const validatePriority = (priority: number | undefined) =>
 const validateName = (name: string | undefined) =>
   name === undefined || name.trim().length > 0 ? [] : ["name: must not be empty"];
 
+function buildTestMessage(
+  channel:    ChannelType,
+  to:         string,
+  custom:     string | null,
+  providerId: string,
+): OutboundMessage {
+  const sentAt = new Date().toISOString();
+  const line   = custom ?? "This is a test message from one-way-notification. If you can read it, this provider is configured correctly.";
+  if (channel !== "email") {
+    return { channel, to, subject: null, body: line, text: null, idempotencyKey: `test-${providerId}-${Date.now()}` };
+  }
+  const escaped = line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return {
+    channel,
+    to,
+    subject:        "Test message from one-way-notification",
+    body:           `<!doctype html><html><body style="font-family:sans-serif"><p>${escaped}</p><p style="color:#888;font-size:12px">Sent ${sentAt}</p></body></html>`,
+    text:           `${line}\n\nSent ${sentAt}`,
+    idempotencyKey: `test-${providerId}-${Date.now()}`,
+  };
+}
+
 export class Providers extends Context.Service<
   Providers,
   ProvidersService
@@ -68,8 +94,9 @@ export class Providers extends Context.Service<
   static readonly layer = Layer.effect(
     Providers,
     Effect.gen(function* () {
-      const repo   = yield* ProvidersRepo;
-      const config = yield* AppConfigService;
+      const repo    = yield* ProvidersRepo;
+      const config  = yield* AppConfigService;
+      const senders = yield* SenderRegistry;
 
       const key = Option.map(config.providerSecretKey, (secret) => deriveKey(Redacted.value(secret)));
 
@@ -243,6 +270,39 @@ export class Providers extends Context.Service<
           };
         });
 
+      const resetChannelProviderHealth: ProvidersService["resetChannelProviderHealth"] =
+        Effect.fn("Providers.resetChannelProviderHealth")(function* (id) {
+          const provider = yield* repo.resetChannelProviderHealth(id);
+          if (provider === null) {
+            return yield* new ChannelProviderNotFound({ id });
+          }
+          return provider;
+        });
+
+      const testChannelProvider: ProvidersService["testChannelProvider"] =
+        Effect.fn("Providers.testChannelProvider")(function* (id, input) {
+          const credentials = yield* resolveProviderCredentials(id);
+          const to          = input.to.trim();
+
+          const problem = validateRecipient(credentials.channel, to);
+          if (problem !== null) {
+            return yield* invalid([`to: ${problem}`]);
+          }
+
+          const message = buildTestMessage(credentials.channel, to, input.message?.trim() || null, id);
+          const result  = yield* senders.send(credentials, message, config.delivery.sendTimeoutMs);
+
+          return new ProviderTestResult({
+            ok:              result.ok,
+            recipient:       to,
+            status_code:     result.statusCode,
+            provider_ref_id: result.ok ? result.providerRefId : null,
+            error:           result.ok ? null : result.error,
+            retryable:       result.ok ? false : result.retryable,
+            duration_ms:     result.durationMs,
+          });
+        });
+
       // ---------- provider_usage_log ----------
 
       const addProviderUsageLog: ProvidersService["addProviderUsageLog"] =
@@ -267,6 +327,8 @@ export class Providers extends Context.Service<
         listChannelProviders,
         updateChannelProvider,
         deleteChannelProvider,
+        resetChannelProviderHealth,
+        testChannelProvider,
         resolveProviderCredentials,
         addProviderUsageLog,
         listProviderUsageLogByDelivery,

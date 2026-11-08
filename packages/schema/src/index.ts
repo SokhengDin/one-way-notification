@@ -23,3 +23,6 @@ export * from "./providers/provider-kinds";
 export * from "./stats/stats";
 export * from "./stats/stats.errors";
 export * from "./api/stats";
+export * from "./deliveries/deliveries";
+export * from "./deliveries/deliveries.errors";
+export * from "./api/deliveries";

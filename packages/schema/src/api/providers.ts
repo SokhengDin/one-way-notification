@@ -5,6 +5,7 @@ import { channelTypeSchema } from "../enums";
 import {
   ChannelProviderRecord,
   ProviderConfigValueSchema,
+  ProviderTestResult,
   ProviderUsageLogRecord,
 } from "../providers/providers";
 import {
@@ -76,6 +77,24 @@ export class ProvidersApiGroup extends HttpApiGroup.make("providers")
         error: [ChannelProviderNotFound, ProviderRepoError],
       },
     ),
+
+    // Send a real test message through this provider, bypassing the queue.
+    HttpApiEndpoint.post("testChannelProvider", "/channel-provider/:id/test", {
+      params: { id: Uuid },
+      payload: Schema.Struct({
+        // email address, E.164 phone number or Telegram chat id
+        to: Schema.String,
+        message: Schema.optional(Schema.String),
+      }),
+      success: ApiResponse(ProviderTestResult),
+      error: [ChannelProviderNotFound, ProviderInvalid, ProviderSecretsUnavailable, ProviderRepoError],
+    }),
+    // Close the circuit breaker: clear the cooldown and failure streak.
+    HttpApiEndpoint.post("resetChannelProviderHealth", "/channel-provider/:id/reset-health", {
+      params: { id: Uuid },
+      success: ApiResponse(ChannelProviderRecord),
+      error: [ChannelProviderNotFound, ProviderRepoError],
+    }),
 
     // ---------- provider_usage_log ----------
     HttpApiEndpoint.get(

@@ -34,6 +34,16 @@ export const ProvidersApiHandlers = HttpApiBuilder.group(
       .handle("deleteChannelProvider", ({ params }) =>
         providers.deleteChannelProvider(params.id),
       )
+      .handle("testChannelProvider", ({ params, payload }) =>
+        providers
+          .testChannelProvider(params.id, payload)
+          .pipe(Effect.map((data) => ok(data))),
+      )
+      .handle("resetChannelProviderHealth", ({ params }) =>
+        providers
+          .resetChannelProviderHealth(params.id)
+          .pipe(Effect.map((data) => ok(data))),
+      )
       // ---------- provider_usage_log ----------
       .handle("listProviderUsageLogByDelivery", ({ params, query }) =>
         providers

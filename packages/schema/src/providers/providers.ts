@@ -20,6 +20,13 @@ export class ChannelProviderRecord extends Schema.Class<ChannelProviderRecord>(
   // which secret fields are set (values are write-only)
   secret_keys: Schema.Array(Schema.String),
   priority: Schema.Int,
+  // health, maintained by the delivery worker
+  consecutive_failures: Schema.Int,
+  last_success_at: Schema.NullOr(Schema.Date),
+  last_failure_at: Schema.NullOr(Schema.Date),
+  last_error: Schema.NullOr(Schema.String),
+  // circuit breaker: while in the future, tried only after healthy providers
+  cooldown_until: Schema.NullOr(Schema.Date),
   created_at: Schema.Date,
   updated_at: Schema.NullOr(Schema.Date),
   deleted_at: Schema.NullOr(Schema.Date),
@@ -36,4 +43,18 @@ export class ProviderUsageLogRecord extends Schema.Class<ProviderUsageLogRecord>
   cost: Schema.NullOr(Schema.String),
   raw_response: Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)),
   attempted_at: Schema.Date,
+}) {}
+
+/** Outcome of sending a test message through one provider. */
+export class ProviderTestResult extends Schema.Class<ProviderTestResult>(
+  "ProviderTestResult",
+)({
+  ok: Schema.Boolean,
+  recipient: Schema.String,
+  status_code: Schema.NullOr(Schema.Int),
+  provider_ref_id: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+  // transient errors (timeouts, 5xx, rate limits) are worth retrying
+  retryable: Schema.Boolean,
+  duration_ms: Schema.Int,
 }) {}

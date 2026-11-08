@@ -11,8 +11,11 @@ export const UsersApiHandlers = HttpApiBuilder.group(
 
     return handlers
       .handle("listUsers", ({ query }) => users.listUsers(query).pipe(Effect.map((data) => ok(data))))
-      .handle("addUser", () =>
-        users.addUser({}).pipe(Effect.map((data) => ok(data, 201, "Created"))),
+      .handle("addUser", ({ payload }) =>
+        users.addUser(payload).pipe(Effect.map((data) => ok(data, 201, "Created"))),
+      )
+      .handle("updateUser", ({ params, payload }) =>
+        users.updateUser(params.id, payload).pipe(Effect.map((data) => ok(data))),
       )
       .handle("getUserById", ({ params }) =>
         users.getUserById(params.id).pipe(Effect.map((data) => ok(data))),

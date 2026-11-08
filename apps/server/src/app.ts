@@ -13,23 +13,41 @@ import { ProvidersApiHandlers } from "./domain/providers/providers.http";
 import { AssetsApiHandlers } from "./domain/assets/assets.http";
 import { SystemApiHandlers } from "./domain/system/system.http";
 import { StatsApiHandlers } from "./domain/stats/stats.http";
-
-const ApiLive = HttpApiBuilder.layer(Api).pipe(
-  Layer.provide([
-    UsersApiHandlers,
-    NotificationsApiHandlers,
-    ExternalSystemsApiHandlers,
-    ProvidersApiHandlers,
-    AssetsApiHandlers,
-    StatsApiHandlers,
-    SystemApiHandlers,
-  ]),
-  Layer.provide(PgLive),
-);
+import { DeliveriesApiHandlers } from "./domain/delivery/delivery.http";
+import { DeliveryWorkerLive } from "./domain/delivery/delivery.worker";
+import { SenderRegistry } from "./domain/delivery/senders";
 
 const SwaggerLive = HttpApiSwagger.layer(Api, { path: "/docs" });
 
-export const AppRoutes = Layer.mergeAll(ApiLive, SwaggerLive);
+/**
+ * The routes, with the way messages leave the building plugged in: the real
+ * provider adapters in production, a scripted fake in tests.
+ */
+export const makeAppRoutes = (senders: Layer.Layer<SenderRegistry>) => {
+  const ApiLive = HttpApiBuilder.layer(Api).pipe(
+    Layer.provide([
+      UsersApiHandlers,
+      NotificationsApiHandlers,
+      ExternalSystemsApiHandlers,
+      ProvidersApiHandlers,
+      AssetsApiHandlers,
+      StatsApiHandlers,
+      DeliveriesApiHandlers,
+      SystemApiHandlers,
+    ]),
+    Layer.provide(senders),
+    Layer.provide(PgLive),
+  );
+  return Layer.mergeAll(ApiLive, SwaggerLive);
+};
+
+export const AppRoutes = makeAppRoutes(SenderRegistry.live);
+
+/** The background delivery worker (not started by tests). */
+export const WorkerLive = DeliveryWorkerLive.pipe(
+  Layer.provide(SenderRegistry.live),
+  Layer.provide(PgLive),
+);
 
 export const corsMiddleware = (allowedOrigins: ReadonlyArray<string>) =>
   HttpMiddleware.cors({

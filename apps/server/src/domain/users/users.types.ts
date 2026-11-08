@@ -12,7 +12,17 @@ import type {
   UserRepoError,
 } from "@repo/schema";
 
-export interface AddUser {}
+export interface AddUser {
+  readonly name?: string | null;
+}
+
+export interface UpdateUser {
+  readonly name?: string | null;
+}
+
+export interface ListUsersInput extends PaginationInput {
+  readonly q?: string;
+}
 
 export interface AddUserPreference {
   readonly user_id: string;
@@ -44,8 +54,13 @@ export interface UserRepoService {
   ) => Effect.Effect<UserRecord | null, UserRepoError>;
 
   readonly listUsers: (
-    input: PaginationInput,
+    input: ListUsersInput,
   ) => Effect.Effect<PaginatedResult<UserRecord>, UserRepoError>;
+
+  readonly updateUser: (
+    id: string,
+    input: UpdateUser,
+  ) => Effect.Effect<UserRecord | null, UserRepoError>;
 
   readonly deleteUser: (id: string) => Effect.Effect<boolean, UserRepoError>;
 
@@ -89,8 +104,13 @@ export interface UsersService {
   ) => Effect.Effect<UserRecord, UserRepoError | UserNotFound>;
 
   readonly listUsers: (
-    input: PaginationInput,
+    input: ListUsersInput,
   ) => Effect.Effect<PaginatedResult<UserRecord>, UserRepoError>;
+
+  readonly updateUser: (
+    id: string,
+    input: UpdateUser,
+  ) => Effect.Effect<UserRecord, UserRepoError | UserNotFound>;
 
   readonly deleteUser: (
     id: string,

@@ -50,6 +50,16 @@ export class Users extends Context.Service<Users, UsersService>()(
         return yield* repo.listUsers(input);
       });
 
+      const updateUser: UsersService["updateUser"] = Effect.fn(
+        "Users.updateUser",
+      )(function* (id, input) {
+        const user = yield* repo.updateUser(id, input);
+        if (user === null) {
+          return yield* new UserNotFound({ id });
+        }
+        return user;
+      });
+
       const deleteUser: UsersService["deleteUser"] = Effect.fn(
         "Users.deleteUser",
       )(function* (id) {
@@ -110,6 +120,7 @@ export class Users extends Context.Service<Users, UsersService>()(
         addUser,
         getUserById,
         listUsers,
+        updateUser,
         deleteUser,
         listUserContacts,
         getUserContact,

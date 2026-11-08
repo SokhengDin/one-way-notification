@@ -8,6 +8,8 @@ import type {
   NotificationNotFound,
   NotificationRecord,
   NotificationRepoError,
+  NotificationSummary,
+  NotificationUndeliverable,
   NotificationTemplateConflict,
   NotificationTemplateInvalid,
   NotificationTemplateNotFound,
@@ -51,6 +53,27 @@ export interface AddNotification {
   readonly event_type: string;
   readonly payload: Record<string, unknown>;
   readonly idempotency_key?: string | null;
+  /** limit fan-out to these channels; default: every channel with a template */
+  readonly channels?: ReadonlyArray<ChannelType>;
+}
+
+export interface InsertNotification extends AddNotification {
+  /** attempt budget for the deliveries this creates */
+  readonly max_attempts: number;
+}
+
+/** What the repo did with an insert; the service turns problems into errors. */
+export type InsertNotificationResult =
+  | { readonly _tag: "Created"; readonly notification: NotificationRecord }
+  | { readonly _tag: "Replayed"; readonly notification: NotificationRecord }
+  | { readonly _tag: "UnknownUser" }
+  | { readonly _tag: "NoTemplates" };
+
+export interface ListNotificationsInput extends PaginationInput {
+  readonly external_system_id?: string;
+  readonly user_id?: string;
+  readonly event_type?: string;
+  readonly outcome?: "failed" | "active" | "sent";
 }
 
 // ---------- notification_deliveries ----------
@@ -91,21 +114,22 @@ export interface NotificationRepoService {
   ) => Effect.Effect<boolean, NotificationRepoError>;
 
   // notifications
+  /** Insert the notification and plan one delivery per channel, atomically. */
   readonly addNotification: (
-    input: AddNotification,
+    input: InsertNotification,
   ) => Effect.Effect<
-    NotificationRecord,
+    InsertNotificationResult,
     NotificationRepoError | NotificationConflict
   >;
 
   readonly findNotificationById: (
     id: string,
-  ) => Effect.Effect<NotificationRecord | null, NotificationRepoError>;
+  ) => Effect.Effect<NotificationSummary | null, NotificationRepoError>;
 
   readonly listNotifications: (
-    input: PaginationInput,
+    input: ListNotificationsInput,
   ) => Effect.Effect<
-    PaginatedResult<NotificationRecord>,
+    PaginatedResult<NotificationSummary>,
     NotificationRepoError
   >;
 
@@ -186,20 +210,20 @@ export interface NotificationsService {
     input: AddNotification,
   ) => Effect.Effect<
     NotificationRecord,
-    NotificationRepoError | NotificationConflict
+    NotificationRepoError | NotificationConflict | NotificationUndeliverable
   >;
 
   readonly getNotificationById: (
     id: string,
   ) => Effect.Effect<
-    NotificationRecord,
+    NotificationSummary,
     NotificationRepoError | NotificationNotFound
   >;
 
   readonly listNotifications: (
-    input: PaginationInput,
+    input: ListNotificationsInput,
   ) => Effect.Effect<
-    PaginatedResult<NotificationRecord>,
+    PaginatedResult<NotificationSummary>,
     NotificationRepoError
   >;
 
