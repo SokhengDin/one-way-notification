@@ -108,9 +108,12 @@ export function DataTable<T>({
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-center">
-        <AlertCircle className="size-6 text-destructive" />
-        <p className="text-sm text-destructive">
+      <div className="fade-up flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-12 text-center" role="alert">
+        <span className="flex size-12 items-center justify-center rounded-2xl bg-red-50 text-red-600 ring-8 ring-red-50/40 dark:bg-red-950 dark:text-red-400 dark:ring-red-950/30">
+          <AlertCircle className="size-5" aria-hidden />
+        </span>
+        <p className="mt-2 text-sm font-semibold">Couldn&apos;t load this list</p>
+        <p className="max-w-sm text-sm text-muted-foreground">
           {error instanceof Error ? error.message : "Failed to load data."}
         </p>
       </div>
@@ -119,9 +122,11 @@ export function DataTable<T>({
 
   if (!data || data.items.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed py-12 text-center">
-        <Inbox className="size-6 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      <div className="fade-up flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-12 text-center">
+        <span className="flex size-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-500 ring-8 ring-zinc-50 dark:bg-zinc-800 dark:ring-zinc-900">
+          <Inbox className="size-5" aria-hidden />
+        </span>
+        <p className="mt-2 text-sm font-medium text-muted-foreground">{emptyMessage}</p>
         {emptyAction && <div className="mt-2">{emptyAction}</div>}
       </div>
     );
@@ -158,7 +163,7 @@ export function DataTable<T>({
                 <TableRow
                   key={rowKey(row)}
                   className={cn(
-                    "fade-up transition-colors even:bg-muted/30 hover:bg-primary/5",
+                    "fade-up transition-colors even:bg-zinc-50/60 hover:bg-blue-50/60 dark:even:bg-zinc-900/40 dark:hover:bg-blue-950/30",
                     href && "group cursor-pointer focus-visible:bg-primary/10 focus-visible:outline-none",
                   )}
                   style={{ animationDelay: `${Math.min(rowIndex, 12) * 15}ms` }}
@@ -198,7 +203,7 @@ export function DataTable<T>({
             <b className="font-medium text-foreground">{to.toLocaleString()}</b> of{" "}
             <b className="font-medium text-foreground">{total.toLocaleString()}</b>
           </span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <label className="flex items-center gap-2">
               Rows per page
               <Select

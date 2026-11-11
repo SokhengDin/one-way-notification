@@ -16,6 +16,7 @@ export default function NewUserPage() {
 
   const mutation = useMutation({
     mutationFn: () => addUser({ name: name.trim() || null }),
+    meta: { success: "User created", inline: true },
     onSuccess:  (response) => router.push(`/users/${response.data.id}`),
   });
 

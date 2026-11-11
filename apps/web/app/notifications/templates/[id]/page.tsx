@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "../../../../components/button";
 import { Card } from "../../../../components/card";
 import { ConfirmButton } from "../../../../components/confirm-button";
@@ -55,6 +55,7 @@ export default function NotificationTemplateDetailPage() {
   const isDirty = !!data && (template !== data.template || subject !== (data.subject ?? ""));
 
   const updateMutation = useMutation({
+    meta: { inline: true },
     mutationFn: () => updateNotificationTemplate(templateId, { template, subject: subject || null }),
     onSuccess: () => {
       toast.success("Template saved");
@@ -64,6 +65,7 @@ export default function NotificationTemplateDetailPage() {
   });
 
   const deleteMutation = useMutation({
+    meta: { inline: true },
     mutationFn: () => deleteNotificationTemplate(templateId),
     onSuccess: () => {
       toast.success("Template deleted");

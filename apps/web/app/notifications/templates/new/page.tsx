@@ -43,6 +43,7 @@ export default function NewNotificationTemplatePage() {
   );
 
   const mutation = useMutation({
+    meta: { success: "Template created", inline: true },
     mutationFn: () =>
       addNotificationTemplate({
         external_system_id: externalSystemId,

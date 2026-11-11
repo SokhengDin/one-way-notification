@@ -16,6 +16,7 @@ export default function NewExternalSystemPage() {
 
   const mutation = useMutation({
     mutationFn: () => addExternalSystem({ name, api_key: apiKey }),
+    meta: { success: "External system created", inline: true },
     onSuccess: (response) => router.push(`/external-systems/${response.data.id}`),
   });
 

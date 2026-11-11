@@ -111,7 +111,7 @@ const editorTheme = EditorView.theme({
     boxShadow: "0 0 0 3px color-mix(in oklab, var(--ring) 35%, transparent)",
   },
   ".cm-scroller": {
-    fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
+    fontFamily: "var(--font-mono)",
     lineHeight: "1.6",
   },
   ".cm-content":     { padding: "8px 0" },

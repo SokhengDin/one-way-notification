@@ -49,6 +49,7 @@ export default function NewNotificationPage() {
   };
 
   const mutation = useMutation({
+    meta: { success: "Notification queued", inline: true },
     mutationFn: () =>
       addNotification({
         external_system_id: externalSystemId,

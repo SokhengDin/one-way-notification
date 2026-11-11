@@ -7,7 +7,7 @@ import type { DeliveryListItem, DeliveryQueueStats } from "@repo/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ban, Play, RotateCcw } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { cancelDelivery, processDueDeliveries, retryDelivery, retryFailedDeliveries } from "@/lib/api/deliveries";
 import { errorMessage } from "@/lib/errors";
@@ -40,7 +40,7 @@ export function DeliveryActions({ delivery, compact = false }: { delivery: Deliv
       toast.success(delivery.status === "retrying" ? "Sending now" : "Queued to send again");
       invalidate();
     },
-    onError: (error) => toast.error(errorMessage(error, "Could not retry")),
+    onError: (error) => toast.error("Could not retry", { description: errorMessage(error, "Please try again.") }),
   });
 
   // cancelling is reversible (a cancelled delivery can be retried), so no
@@ -49,11 +49,17 @@ export function DeliveryActions({ delivery, compact = false }: { delivery: Deliv
     mutationFn: () => cancelDelivery(delivery.id),
     onSuccess:  () => {
       toast.success("Delivery cancelled", {
-        action: { label: "Undo", onClick: () => void retryDelivery(delivery.id).then(invalidate) },
+        action: {
+          label:   "Undo",
+          onClick: () =>
+            void retryDelivery(delivery.id)
+              .then(() => { toast.success("Delivery queued again"); invalidate(); })
+              .catch((error: unknown) => toast.error("Could not undo", { description: errorMessage(error, "The delivery stays cancelled.") })),
+        },
       });
       invalidate();
     },
-    onError: (error) => toast.error(errorMessage(error, "Could not cancel")),
+    onError: (error) => toast.error("Could not cancel", { description: errorMessage(error, "Please try again.") }),
   });
 
   if (!canRetry(delivery) && !canCancel(delivery)) return null;
@@ -196,7 +202,7 @@ export function QueueActions({ queue }: { queue: DeliveryQueueStats }) {
       toast.success(claimed === 0 ? "Nothing was due" : `Processed ${claimed}: ${sent} sent, ${retrying} retrying, ${failed} failed`);
       invalidate();
     },
-    onError: (error) => toast.error(errorMessage(error, "Could not process the queue")),
+    onError: (error) => toast.error("Could not process the queue", { description: errorMessage(error, "Please try again.") }),
   });
 
   const retryAll = useMutation({
@@ -205,7 +211,7 @@ export function QueueActions({ queue }: { queue: DeliveryQueueStats }) {
       toast.success(`Requeued ${response.data.retried} failed deliveries`);
       invalidate();
     },
-    onError: (error) => toast.error(errorMessage(error, "Could not requeue")),
+    onError: (error) => toast.error("Could not requeue", { description: errorMessage(error, "Please try again.") }),
   });
 
   return (

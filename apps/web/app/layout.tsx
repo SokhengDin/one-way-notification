@@ -1,19 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryProvider } from "./query-provider";
 import { Shell } from "./shell";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 const APP_NAME = "one-way-notification";
 
@@ -37,10 +26,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#2563EB" },
-    { media: "(prefers-color-scheme: dark)",  color: "#0B1220" },
+    { media: "(prefers-color-scheme: light)", color: "#172554" },
+    { media: "(prefers-color-scheme: dark)",  color: "#0b1530" },
   ],
-  colorScheme: "light",
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({
@@ -49,10 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${geistMono.variable} antialiased`}
-    >
+    <html lang="en" className="antialiased">
       <body className="min-h-screen">
         <QueryProvider>
           <Shell>{children}</Shell>

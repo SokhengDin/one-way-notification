@@ -1,5 +1,6 @@
 "use client";
 
+import { errorMessage } from "../../../lib/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -57,11 +58,13 @@ export default function ExternalSystemDetailPage() {
   }
 
   const updateMutation = useMutation({
+    meta: { success: "External system saved", inline: true },
     mutationFn: () => updateExternalSystem(systemId, { name, api_key: apiKey }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["external-system", systemId] }),
   });
 
   const deleteMutation = useMutation({
+    meta: { success: "External system deleted", error: "Could not delete the external system" },
     mutationFn: () => deleteExternalSystem(systemId),
     onSuccess: () => router.push("/external-systems"),
   });
@@ -70,6 +73,7 @@ export default function ExternalSystemDetailPage() {
   const [userId, setUserId] = useState("");
 
   const linkMutation = useMutation({
+    meta: { success: "User linked", inline: true },
     mutationFn: () => addExternalUserLink(systemId, { external_user_id: externalUserId, user_id: userId }),
     onSuccess: () => {
       setExternalUserId("");
@@ -106,13 +110,13 @@ export default function ExternalSystemDetailPage() {
           }}
         >
           {updateMutation.isError && (
-            <p className="text-sm text-destructive">
-              {updateMutation.error instanceof Error ? updateMutation.error.message : "Failed to update system."}
+            <p className="text-sm text-destructive" role="alert">
+              {errorMessage(updateMutation.error, "Failed to update system.")}
             </p>
           )}
           <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} />
           <div className="flex items-end gap-2">
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <TextField
                 label="API key"
                 type={showApiKey ? "text" : "password"}
@@ -145,31 +149,39 @@ export default function ExternalSystemDetailPage() {
           emptyMessage="No users linked to this system yet."
         />
         <form
-          className="mt-4 flex items-end gap-3 border-t pt-4"
+          className="mt-4 flex flex-col gap-3 border-t pt-4"
           onSubmit={(event) => {
             event.preventDefault();
+            if (!userId || !externalUserId.trim()) return;
             linkMutation.mutate();
           }}
         >
           {linkMutation.isError && (
-            <p className="text-sm text-destructive">
-              {linkMutation.error instanceof Error ? linkMutation.error.message : "Failed to add link."}
+            <p className="text-sm text-destructive" role="alert">
+              {errorMessage(linkMutation.error, "Failed to add link.")}
             </p>
           )}
-          <div className="flex-1">
-            <UserPicker value={userId} onChange={(id) => setUserId(id)} />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <UserPicker value={userId} onChange={(id) => setUserId(id)} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <TextField
+                label="Their id in this system"
+                value={externalUserId}
+                onChange={(event) => setExternalUserId(event.target.value)}
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={linkMutation.isPending || !userId || !externalUserId.trim()}
+              title={!userId ? "Pick a user first" : undefined}
+            >
+              {linkMutation.isPending ? "Linking…" : "Add link"}
+            </Button>
           </div>
-          <div className="flex-1">
-            <TextField
-              label="Their id in this system"
-              value={externalUserId}
-              onChange={(event) => setExternalUserId(event.target.value)}
-              required
-            />
-          </div>
-          <Button type="submit" variant="secondary" disabled={linkMutation.isPending}>
-            {linkMutation.isPending ? "Linking…" : "Add link"}
-          </Button>
         </form>
       </Card>
     </div>

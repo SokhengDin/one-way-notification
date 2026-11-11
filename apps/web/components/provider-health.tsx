@@ -4,7 +4,7 @@ import type { ChannelProviderRecord, ProviderTestResult } from "@repo/schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Send, XCircle } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { resetChannelProviderHealth, testChannelProvider } from "@/lib/api/providers";
@@ -72,7 +72,7 @@ export function ProviderHealthCard({ provider }: { provider: ChannelProviderReco
       toast.success("Health reset. It's tried in priority order again.");
       refresh();
     },
-    onError: (error) => toast.error(errorMessage(error, "Could not reset")),
+    onError: (error) => toast.error("Could not reset", { description: errorMessage(error, "Please try again.") }),
   });
 
   const test = useMutation({
@@ -80,7 +80,7 @@ export function ProviderHealthCard({ provider }: { provider: ChannelProviderReco
     onSuccess:  (response) => setResult(response.data),
     onError:    (error) => {
       setResult(null);
-      toast.error(errorMessage(error, "Could not send the test"));
+      toast.error("Could not send the test", { description: errorMessage(error, "Please try again.") });
     },
   });
 
