@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
   readonly title: React.ReactNode;
@@ -7,11 +8,12 @@ interface PageHeaderProps {
   readonly actions?: React.ReactNode;
   /** where "back" goes on a detail page, e.g. { href: "/users", label: "Users" } */
   readonly back?: { readonly href: string; readonly label: string };
+  readonly className?: string;
 }
 
-export function PageHeader({ title, description, actions, back }: PageHeaderProps) {
+export function PageHeader({ title, description, actions, back, className }: PageHeaderProps) {
   return (
-    <div className="mb-6 border-b pb-5">
+    <div className={cn("mb-6 border-b pb-5", className)}>
       {back && (
         <Link
           href={back.href}

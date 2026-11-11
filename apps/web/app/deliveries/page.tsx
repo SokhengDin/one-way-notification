@@ -55,7 +55,7 @@ const columns: ReadonlyArray<DataTableColumn<DeliveryListItem>> = [
   },
   {
     header: "Recipient",
-    cell: (row) => <UserLink id={row.user_id} name={row.user_display_name} detail={row.recipient} />,
+    cell: (row) => <UserLink id={row.user_id} systemId={row.external_system_id} name={row.user_display_name} detail={row.recipient} />,
   },
   {
     header: "Event",

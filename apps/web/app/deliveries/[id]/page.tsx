@@ -58,7 +58,7 @@ export default function DeliveryPage() {
 
             <dt className="text-muted-foreground">To</dt>
             <dd className="flex flex-col gap-1">
-              <UserLink id={delivery.user_id} name={delivery.user_display_name} />
+              <UserLink id={delivery.user_id} systemId={delivery.external_system_id} name={delivery.user_display_name} />
               <span className="font-mono text-xs text-muted-foreground">{delivery.recipient ?? "no address"}</span>
             </dd>
 

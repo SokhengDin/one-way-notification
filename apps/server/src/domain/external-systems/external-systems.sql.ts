@@ -5,6 +5,7 @@ import {
   ExternalUserLinkConflict,
   ExternalUserLinkRecord,
   makeMapSqlError,
+  SystemUserRecord,
   normalizePagination,
   type ExternalSystemRepoOperation,
 } from "@repo/schema";
@@ -243,6 +244,85 @@ export function makeSqlExternalSystemsRepo(
       return rows.length > 0;
     });
 
+  // ---------- users under a system ----------
+
+  const SYSTEM_USER_COLUMNS = sql.literal(`
+    u.id, x.id AS link_id, x.external_system_id, x.external_user_id,
+    ul.name, ul.email, ul.display_name, ul.channels,
+    (SELECT count(*)::int FROM external_user_links o
+      WHERE o.user_id = u.id AND o.external_system_id <> x.external_system_id AND o.deleted_at IS NULL) AS other_systems,
+    x.created_at
+  `);
+
+  const listSystemUsers: ExternalSystemRepoService["listSystemUsers"] =
+    Effect.fn("ExternalSystemsRepo.listSystemUsers")(function* (externalSystemId, input) {
+      const { skip, limit } = normalizePagination(input);
+      const q       = input.q?.trim() ?? "";
+      const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const rows = yield* sql<SystemUserRecord & { readonly total_count: number }>`
+        SELECT ${SYSTEM_USER_COLUMNS}, COUNT(*) OVER()::int AS total_count
+        FROM external_user_links x
+        JOIN users u        ON u.id = x.user_id AND u.deleted_at IS NULL
+        JOIN user_labels ul ON ul.id = u.id
+        WHERE x.external_system_id = ${externalSystemId} AND x.deleted_at IS NULL
+          AND (${q} = '' OR ul.display_name ILIKE ${pattern} OR ul.email ILIKE ${pattern}
+               OR x.external_user_id ILIKE ${pattern} OR u.id::text = ${q})
+        ORDER BY x.created_at DESC
+        LIMIT ${limit} OFFSET ${skip}
+      `.pipe(mapSqlError("listSystemUsers"));
+      return {
+        items: rows.map((row) => new SystemUserRecord(row)),
+        total: rows[0]?.total_count ?? 0,
+        skip,
+        limit,
+      };
+    });
+
+  const addSystemUser: ExternalSystemRepoService["addSystemUser"] =
+    Effect.fn("ExternalSystemsRepo.addSystemUser")(function* (externalSystemId, input) {
+      const insert = Effect.gen(function* () {
+        const [user] = yield* sql<{ id: string }>`
+          INSERT INTO users (name) VALUES (${input.name}) RETURNING id
+        `;
+        const [link] = yield* sql<{ id: string }>`
+          INSERT INTO external_user_links (external_system_id, external_user_id, user_id)
+          VALUES (${externalSystemId}, ${input.external_user_id}, ${user!.id})
+          RETURNING id
+        `;
+        const contacts = [
+          input.email    ? { channel: "email",    address: input.email,    linked: true }  : null,
+          input.phone    ? { channel: "sms",      address: input.phone,    linked: true }  : null,
+          input.telegram ? { channel: "telegram", address: input.telegram, linked: true }  : null,
+        ].filter((contact) => contact !== null);
+        for (const contact of contacts) {
+          yield* sql`
+            INSERT INTO user_contacts (user_id, channel, address, linked, verified)
+            VALUES (${user!.id}, ${contact.channel}::channel_type, ${contact.address}, ${contact.linked}, false)
+          `;
+        }
+        const [row] = yield* sql<SystemUserRecord>`
+          SELECT ${SYSTEM_USER_COLUMNS}
+          FROM external_user_links x
+          JOIN users u        ON u.id = x.user_id
+          JOIN user_labels ul ON ul.id = u.id
+          WHERE x.id = ${link!.id}
+        `;
+        return new SystemUserRecord(row!);
+      });
+
+      return yield* sql.withTransaction(insert).pipe(
+        Effect.catchReason(
+          "SqlError",
+          "UniqueViolation",
+          () =>
+            new ExternalUserLinkConflict({
+              message: `external_user_id: "${input.external_user_id}" is already a user of this system`,
+            }),
+          (_reasons, error) => Effect.fail(toExternalSystemRepoError("addSystemUser", error)),
+        ),
+      );
+    });
+
   return {
     addExternalSystem,
     findExternalSystemById,
@@ -253,5 +333,7 @@ export function makeSqlExternalSystemsRepo(
     listExternalUserLinksByUser,
     listExternalUserLinksBySystem,
     deleteExternalUserLink,
+    listSystemUsers,
+    addSystemUser,
   };
 }

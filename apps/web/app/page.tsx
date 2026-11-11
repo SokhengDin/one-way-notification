@@ -285,7 +285,7 @@ function ChannelsCard({ stats }: { readonly stats: StatsOverview }) {
 function InventoryCard({ stats }: { readonly stats: StatsOverview }) {
   const { inventory } = stats;
   const items = [
-    { label: "Users",            value: formatCount(inventory.users),            href: "/users" },
+    { label: "Users",            value: formatCount(inventory.users),            href: "/external-systems" },
     { label: "External systems", value: formatCount(inventory.external_systems), href: "/external-systems" },
     { label: "Templates",        value: formatCount(inventory.templates),        href: "/notifications/templates" },
     { label: "Active providers", value: `${formatCount(inventory.providers_active)} of ${formatCount(inventory.providers_total)}`, href: "/providers" },

@@ -9,6 +9,8 @@ import type {
   ExternalUserLinkRecord,
   PaginatedResult,
   PaginationInput,
+  SystemUserInvalid,
+  SystemUserRecord,
 } from "@repo/schema";
 
 // ---------- external_systems ----------
@@ -33,7 +35,40 @@ export interface AddExternalUserLink {
   readonly user_id: string;
 }
 
+// ---------- users under a system ----------
+
+export interface ListSystemUsersInput extends PaginationInput {
+  readonly q?: string;
+}
+
+/** already trimmed and checked */
+export interface AddSystemUser {
+  readonly external_user_id: string;
+  readonly name:             string | null;
+  readonly email:            string | null;
+  readonly phone:            string | null;
+  readonly telegram:         string | null;
+}
+
+export interface AddSystemUserInput {
+  readonly external_user_id:  string;
+  readonly name?:             string | null;
+  readonly email?:            string | null;
+  readonly phone?:            string | null;
+  readonly telegram_chat_id?: string | null;
+}
+
 export interface ExternalSystemRepoService {
+  readonly listSystemUsers: (
+    externalSystemId: string,
+    input: ListSystemUsersInput,
+  ) => Effect.Effect<PaginatedResult<SystemUserRecord>, ExternalSystemRepoError>;
+
+  readonly addSystemUser: (
+    externalSystemId: string,
+    input: AddSystemUser,
+  ) => Effect.Effect<SystemUserRecord, ExternalSystemRepoError | ExternalUserLinkConflict>;
+
   // external_systems
   readonly addExternalSystem: (
     input: AddExternalSystem,
@@ -95,6 +130,19 @@ export interface ExternalSystemRepoService {
 }
 
 export interface ExternalSystemsService {
+  readonly listSystemUsers: (
+    externalSystemId: string,
+    input: ListSystemUsersInput,
+  ) => Effect.Effect<PaginatedResult<SystemUserRecord>, ExternalSystemRepoError | ExternalSystemNotFound>;
+
+  readonly addSystemUser: (
+    externalSystemId: string,
+    input: AddSystemUserInput,
+  ) => Effect.Effect<
+    SystemUserRecord,
+    ExternalSystemRepoError | ExternalSystemNotFound | ExternalUserLinkConflict | SystemUserInvalid
+  >;
+
   // external_systems
   readonly addExternalSystem: (
     input: AddExternalSystem,

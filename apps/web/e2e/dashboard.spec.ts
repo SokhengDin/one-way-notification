@@ -572,17 +572,24 @@ test.describe("sign-in", () => {
 });
 
 test.describe("names instead of ids", () => {
-  test("a user is created with a name and shown by it everywhere", async ({ page }) => {
+  test("a user is added inside their external system and shown by name", async ({ page }) => {
     const name = `Dara E2E ${Date.now()}`;
-    await page.goto("/users/new");
+    await page.goto(`${systemPath}/users/new`);
+    await page.getByLabel("Their id in this system").fill(`cust-${Date.now()}`);
     await page.getByLabel("Name", { exact: true }).fill(name);
-    await page.getByRole("button", { name: "Create user" }).click();
-    await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}$/);
+    await page.getByLabel("Email").fill(`dara-${Date.now()}@example.com`);
+    await page.getByRole("button", { name: "Add user" }).click();
+    await expect(page).toHaveURL(/\/external-systems\/[0-9a-f-]{36}\/users\/[0-9a-f-]{36}$/);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(name);
 
-    await page.goto("/users");
+    await page.goto(`${systemPath}/users`);
     await page.getByLabel("Search users").fill(name);
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible();
+  });
+
+  test("old /users links still land on the user", async ({ page }) => {
+    await page.goto("/users");
+    await expect(page).toHaveURL(/\/external-systems$/);
   });
 
   test("clicking anywhere on a row opens it", async ({ page }) => {
@@ -593,14 +600,14 @@ test.describe("names instead of ids", () => {
     await row.locator("td").nth(1).click();
     await expect(page).toHaveURL(/\/notifications\/templates\/[0-9a-f-]{36}$/);
 
-    await page.goto("/users");
+    await page.goto(`${systemPath}/users`);
     await page.locator("main table tbody tr").filter({ has: page.getByRole("link") }).first().locator("td").last().click();
-    await expect(page).toHaveURL(/\/users\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/external-systems\/[0-9a-f-]{36}\/users\/[0-9a-f-]{36}$/);
   });
 
   test("lists show user and system names, not UUIDs", async ({ page }) => {
     const uuid = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
-    for (const path of ["/notifications", "/deliveries", "/users", "/notifications/templates", "/external-systems"]) {
+    for (const path of ["/notifications", "/deliveries", `${systemPath}/users`, "/notifications/templates", "/external-systems"]) {
       await page.goto(path);
       await page.waitForLoadState("networkidle");
       expect(await page.locator("main table").innerText(), path).not.toMatch(uuid);
@@ -634,7 +641,7 @@ test("no console errors on the main screens", async ({ page }) => {
 
   for (const path of [
     "/", systemPath, "/notifications/templates", "/notifications/templates/new", "/providers", "/providers/new",
-    "/deliveries", "/notifications", "/notifications/new", "/users",
+    "/deliveries", "/notifications", "/notifications/new", `${systemPath}/users`, `${systemPath}/users/new`,
   ]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");

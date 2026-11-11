@@ -89,7 +89,7 @@ export default function NotificationDetailPage() {
         <Card title="Details">
           <dl className="grid grid-cols-[10rem_1fr] items-center gap-x-6 gap-y-3 text-sm">
             <dt className="text-muted-foreground">User</dt>
-            <dd><UserLink id={notification.user_id} name={notification.user_display_name} /></dd>
+            <dd><UserLink id={notification.user_id} systemId={notification.external_system_id} name={notification.user_display_name} /></dd>
 
             <dt className="text-muted-foreground">External system</dt>
             <dd><SystemLink id={notification.external_system_id} name={notification.system_name} /></dd>

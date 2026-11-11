@@ -12,6 +12,9 @@ export const ExternalSystemRepoOperation = Schema.Literals([
   "listExternalUserLinksByUser",
   "listExternalUserLinksBySystem",
   "deleteExternalUserLink",
+  // users under a system
+  "listSystemUsers",
+  "addSystemUser",
 ]);
 
 export type ExternalSystemRepoOperation =
@@ -59,4 +62,11 @@ export class ExternalUserLinkConflict extends Schema.TaggedErrorClass<ExternalUs
     message: Schema.String,
   },
   { httpApiStatus: 409 },
+) {}
+
+/** A user added inside a system with bad fields (id, email, phone…). */
+export class SystemUserInvalid extends Schema.TaggedErrorClass<SystemUserInvalid>()(
+  "SystemUserInvalid",
+  { message: Schema.String },
+  { httpApiStatus: 422 },
 ) {}

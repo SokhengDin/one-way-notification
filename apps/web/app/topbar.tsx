@@ -8,15 +8,42 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "../components/avatar";
 import { Skeleton } from "../components/ui/skeleton";
 import { getMe, signOut } from "../lib/api/auth";
+import { getExternalSystemById } from "../lib/api/external-systems";
 import { currentNav } from "../lib/nav";
 import { useMounted } from "../lib/use-mounted";
 import { cn } from "../lib/utils";
 
+interface Crumb {
+  readonly label: string;
+  readonly href?: string;
+}
+
+const SYSTEM_PATH = /^\/external-systems\/([0-9a-f-]{36})(\/users(\/(new|[0-9a-f-]{36}))?)?/;
+
+/** Below an external system: its name, then Users and the user (users live inside their system). */
+function useSystemCrumbs(pathname: string): ReadonlyArray<Crumb> | null {
+  const match    = SYSTEM_PATH.exec(pathname);
+  const systemId = match?.[1];
+  const system   = useQuery({
+    queryKey: ["external-system", systemId],
+    queryFn:  () => getExternalSystemById(systemId!),
+    enabled:  systemId !== undefined,
+  });
+  if (!match || !systemId) return null;
+  const base   = `/external-systems/${systemId}`;
+  const crumbs: Array<Crumb> = [{ label: system.data?.data.name ?? "System", href: base }];
+  if (match[2]) crumbs.push({ label: "Users", href: `${base}/users` });
+  if (match[4]) crumbs.push({ label: match[4] === "new" ? "Add user" : "User" });
+  return crumbs;
+}
+
 /** Sticky top bar: where you are (group, page) and who you are (profile menu). */
 export function Topbar({ onMenu }: { onMenu: () => void }) {
-  const pathname = usePathname();
-  const current  = currentNav(pathname);
-  const deeper   = current !== undefined && pathname !== current.href;
+  const pathname     = usePathname();
+  const current      = currentNav(pathname);
+  const systemCrumbs = useSystemCrumbs(pathname);
+  const deeper       = current !== undefined && pathname !== current.href;
+  const trail: ReadonlyArray<Crumb> = systemCrumbs ?? (deeper ? [{ label: "Details" }] : []);
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-white/90 px-4 backdrop-blur sm:px-6 lg:px-8 dark:bg-zinc-950/90">
@@ -38,15 +65,20 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             <Chevron className="hidden sm:block" />
             <span className="hidden text-zinc-500 sm:inline">{current.group}</span>
             <Chevron className="hidden sm:block" />
-            {deeper
+            {trail.length > 0
               ? <Link href={current.href} className="truncate text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">{current.label}</Link>
               : <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">{current.label}</span>}
-            {deeper && (
-              <>
-                <Chevron />
-                <span className="truncate font-medium text-zinc-900 dark:text-zinc-100">Details</span>
-              </>
-            )}
+            {trail.map((crumb, index) => {
+              const last = index === trail.length - 1;
+              return (
+                <span key={`${crumb.label}-${index}`} className="flex min-w-0 items-center gap-1.5">
+                  <Chevron />
+                  {crumb.href && !last
+                    ? <Link href={crumb.href} className="truncate text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">{crumb.label}</Link>
+                    : <span className={cn("truncate", last ? "font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-500")}>{crumb.label}</span>}
+                </span>
+              );
+            })}
           </>
         )}
       </nav>

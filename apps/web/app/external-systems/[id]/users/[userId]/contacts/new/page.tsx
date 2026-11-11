@@ -4,11 +4,11 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { CHANNEL_TYPES, type ChannelType } from "@repo/schema";
-import { Button } from "../../../../../components/button";
-import { Card } from "../../../../../components/card";
-import { CheckboxField, SelectField, TextField } from "../../../../../components/form-field";
-import { PageHeader } from "../../../../../components/page-header";
-import { addUserContact, getUserById } from "../../../../../lib/api/users";
+import { Button } from "@/components/button";
+import { Card } from "@/components/card";
+import { CheckboxField, SelectField, TextField } from "@/components/form-field";
+import { PageHeader } from "@/components/page-header";
+import { addUserContact, getUserById } from "@/lib/api/users";
 
 const CHANNEL_LABEL: Record<ChannelType, string> = { email: "Email", sms: "SMS (phone)", telegram: "Telegram" };
 const ADDRESS_HINT: Record<ChannelType, { placeholder: string; hint: string }> = {
@@ -18,9 +18,10 @@ const ADDRESS_HINT: Record<ChannelType, { placeholder: string; hint: string }> =
 };
 
 export default function NewUserContactPage() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ id: string; userId: string }>();
   const router = useRouter();
-  const userId = params.id;
+  const userId   = params.userId;
+  const userPath = `/external-systems/${params.id}/users/${userId}`;
 
   const [channel, setChannel] = useState<ChannelType>("email");
   const [address, setAddress] = useState("");
@@ -34,13 +35,13 @@ export default function NewUserContactPage() {
     meta: { success: "Contact added", inline: true },
     mutationFn: () =>
       addUserContact(userId, { channel, address: address || null, linked, verified }),
-    onSuccess: () => router.push(`/users/${userId}`),
+    onSuccess: () => router.push(userPath),
   });
 
   return (
     <div>
       <PageHeader
-        back={{ href: `/users/${userId}`, label: userName ?? "User" }}
+        back={{ href: userPath, label: userName ?? "User" }}
         title="Add contact"
         description={userName ? `A way to reach ${userName}.` : undefined}
       />

@@ -35,7 +35,7 @@ const columns: ReadonlyArray<DataTableColumn<NotificationSummary>> = [
       </Link>
     ),
   },
-  { header: "User", cell: (row) => <UserLink id={row.user_id} name={row.user_display_name} /> },
+  { header: "User", cell: (row) => <UserLink id={row.user_id} systemId={row.external_system_id} name={row.user_display_name} /> },
   { header: "External system", cell: (row) => <SystemLink id={row.external_system_id} name={row.system_name} /> },
   {
     header: "Channels",

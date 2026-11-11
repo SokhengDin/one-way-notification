@@ -4,18 +4,19 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ChannelType } from "@repo/schema";
-import { Button } from "../../../../../components/button";
-import { Card } from "../../../../../components/card";
-import { CheckboxField, TextField } from "../../../../../components/form-field";
-import { PageHeader } from "../../../../../components/page-header";
-import { getUserById, getUserContact, updateUserContact } from "../../../../../lib/api/users";
+import { Button } from "@/components/button";
+import { Card } from "@/components/card";
+import { CheckboxField, TextField } from "@/components/form-field";
+import { PageHeader } from "@/components/page-header";
+import { getUserById, getUserContact, updateUserContact } from "@/lib/api/users";
 
 const CHANNEL_LABEL: Record<ChannelType, string> = { email: "email", sms: "phone", telegram: "Telegram" };
 
 export default function EditUserContactPage() {
-  const params = useParams<{ id: string; channel: ChannelType }>();
+  const params = useParams<{ id: string; userId: string; channel: ChannelType }>();
   const router = useRouter();
-  const { id: userId, channel } = params;
+  const { userId, channel } = params;
+  const userPath = `/external-systems/${params.id}/users/${userId}`;
 
   const contactQuery = useQuery({
     queryKey: ["user-contact", userId, channel],
@@ -41,7 +42,7 @@ export default function EditUserContactPage() {
   const mutation = useMutation({
     meta: { success: "Contact saved", inline: true },
     mutationFn: () => updateUserContact(userId, channel, { address: address || null, linked, verified }),
-    onSuccess: () => router.push(`/users/${userId}`),
+    onSuccess: () => router.push(userPath),
   });
 
   if (contactQuery.isLoading) {
@@ -51,7 +52,7 @@ export default function EditUserContactPage() {
   return (
     <div>
       <PageHeader
-        back={{ href: `/users/${userId}`, label: userName ?? "User" }}
+        back={{ href: userPath, label: userName ?? "User" }}
         title={`Edit ${CHANNEL_LABEL[channel] ?? channel} contact`}
         description={userName ? `For ${userName}` : undefined}
       />

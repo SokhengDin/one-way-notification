@@ -239,3 +239,59 @@ describe("users under an external system", () => {
     expect((await api("GET", "/api/user")).json.data.total).toBe(3);
   });
 });
+
+describe("adding users inside an external system", () => {
+  test("creates the user, puts them under the system and adds their contacts in one step", async () => {
+    const system = await createSystem();
+    const res = await api("POST", `/api/external-system/${system.id}/user`, {
+      external_user_id: " cust-42 ", name: "Dara Sok", email: "Dara@Example.com", phone: "+33 6 12 34 56 78", telegram_chat_id: "123456",
+    });
+    expect(res.status).toBe(200);
+    const user = res.json.data;
+    expect(user).toMatchObject({
+      external_system_id: system.id, external_user_id: "cust-42", name: "Dara Sok", email: "dara@example.com",
+      display_name: "Dara Sok", channels: ["email", "sms", "telegram"], other_systems: 0,
+    });
+    const contacts = (await api("GET", `/api/user/${user.id}/contacts`)).json.data.items;
+    expect(contacts.map((c: { address: string }) => c.address).sort()).toEqual(["+33612345678", "123456", "dara@example.com"]);
+
+    const list = (await api("GET", `/api/external-system/${system.id}/user`)).json.data;
+    expect(list.total).toBe(1);
+    expect((await api("GET", `/api/external-system/${system.id}/user?q=cust-4`)).json.data.total).toBe(1);
+    expect((await api("GET", `/api/external-system/${system.id}/user?q=nobody`)).json.data.total).toBe(0);
+  });
+
+  test("only the system's own users are listed", async () => {
+    const [a, b] = [await createSystem(), await createSystem()];
+    await api("POST", `/api/external-system/${a.id}/user`, { external_user_id: "a-1" });
+    await api("POST", `/api/external-system/${b.id}/user`, { external_user_id: "b-1" });
+    const ids = (await api("GET", `/api/external-system/${a.id}/user`)).json.data.items.map((u: { external_user_id: string }) => u.external_user_id);
+    expect(ids).toEqual(["a-1"]);
+  });
+
+  test("their id is unique within the system; nothing half-created on conflict", async () => {
+    const system = await createSystem();
+    expect((await api("POST", `/api/external-system/${system.id}/user`, { external_user_id: "dup" })).status).toBe(200);
+    const before = (await api("GET", "/api/user")).json.data.total;
+    expect((await api("POST", `/api/external-system/${system.id}/user`, { external_user_id: "dup", email: "x@example.com" })).status).toBe(409);
+    expect((await api("GET", "/api/user")).json.data.total).toBe(before);
+  });
+
+  test("fields are checked", async () => {
+    const system = await createSystem();
+    const add = (body: Record<string, unknown>) => api("POST", `/api/external-system/${system.id}/user`, { external_user_id: "u", ...body });
+    expect((await api("POST", `/api/external-system/${system.id}/user`, { external_user_id: "  " })).status).toBe(422);
+    expect((await add({ email: "not-an-email" })).status).toBe(422);
+    expect((await add({ phone: "0612345678" })).status).toBe(422);
+    expect((await add({ telegram_chat_id: "@dara" })).status).toBe(422);
+    expect((await api("POST", "/api/external-system/00000000-0000-0000-0000-000000000000/user", { external_user_id: "u" })).status).toBe(404);
+  });
+
+  test("a user added inside a system can be notified by it", async () => {
+    const system = await createSystem();
+    await createTemplate({ external_system_id: system.id, event_type: "e" });
+    const user = (await api("POST", `/api/external-system/${system.id}/user`, { external_user_id: "u1", email: "u1@example.com" })).json.data;
+    const res = await api("POST", "/api/notification", { external_system_id: system.id, user_id: user.id, event_type: "e", payload: {} });
+    expect(res.status).toBe(200);
+  });
+});

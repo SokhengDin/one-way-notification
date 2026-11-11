@@ -34,6 +34,17 @@ export const ExternalSystemsApiHandlers = HttpApiBuilder.group(
       .handle("deleteExternalSystem", ({ params }) =>
         externalSystems.deleteExternalSystem(params.id),
       )
+      // ---------- users under a system ----------
+      .handle("listSystemUsers", ({ params, query }) =>
+        externalSystems
+          .listSystemUsers(params.externalSystemId, query)
+          .pipe(Effect.map((data) => ok(data))),
+      )
+      .handle("addSystemUser", ({ params, payload }) =>
+        externalSystems
+          .addSystemUser(params.externalSystemId, payload)
+          .pipe(Effect.map((data) => ok(data, 201, "Created"))),
+      )
       // ---------- external_user_links ----------
       .handle("listExternalUserLinksByUser", ({ params, query }) =>
         externalSystems

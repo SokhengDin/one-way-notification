@@ -76,3 +76,27 @@ export const deleteExternalUserLink = (id: string) =>
   runApi((client) =>
     client["external-systems"].deleteExternalUserLink({ params: { id } }),
   );
+
+// ---------- users under a system ----------
+
+export const listSystemUsers = (
+  externalSystemId: string,
+  query: { skip?: number; limit?: number; q?: string },
+) =>
+  runApi((client) =>
+    client["external-systems"].listSystemUsers({ params: { externalSystemId }, query }),
+  );
+
+export const addSystemUser = (
+  externalSystemId: string,
+  payload: {
+    external_user_id:  string;
+    name?:             string | null;
+    email?:            string | null;
+    phone?:            string | null;
+    telegram_chat_id?: string | null;
+  },
+) =>
+  runApi((client) =>
+    client["external-systems"].addSystemUser({ params: { externalSystemId }, payload }),
+  );

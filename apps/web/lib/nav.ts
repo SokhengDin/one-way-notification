@@ -5,7 +5,6 @@ import {
   Inbox,
   LayoutDashboard,
   Radio,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,8 +34,8 @@ export const NAV: ReadonlyArray<NavGroup> = [
     items: [
       { label: "Templates",        href: "/notifications/templates", icon: FileStack },
       { label: "Providers",        href: "/providers",               icon: Radio },
+      // each system's users live inside it (External systems → a system → Users)
       { label: "External systems", href: "/external-systems",        icon: Building2 },
-      { label: "Users",            href: "/users",                   icon: Users },
     ],
   },
 ];

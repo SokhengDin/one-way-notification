@@ -4,11 +4,15 @@ import { cn } from "@/lib/utils";
 
 // Links to the main entities, always by name. Ids stay in the URL.
 
+/** Users live under an external system; without one, /users/:id finds it. */
+export const userHref = (id: string, systemId?: string | null) =>
+  systemId ? `/external-systems/${systemId}/users/${id}` : `/users/${id}`;
+
 export function UserLink({
-  id, name, detail, className,
-}: { id: string; name: string; detail?: string | null; className?: string }) {
+  id, systemId, name, detail, className,
+}: { id: string; systemId?: string | null; name: string; detail?: string | null; className?: string }) {
   return (
-    <Link href={`/users/${id}`} className={cn("group inline-flex min-w-0 items-center gap-2", className)}>
+    <Link href={userHref(id, systemId)} className={cn("group inline-flex min-w-0 items-center gap-2", className)}>
       <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
         {initials(name)}
       </span>
