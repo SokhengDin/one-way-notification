@@ -39,6 +39,7 @@ export default function EditUserContactPage() {
   }
 
   const mutation = useMutation({
+    meta: { success: "Contact saved", inline: true },
     mutationFn: () => updateUserContact(userId, channel, { address: address || null, linked, verified }),
     onSuccess: () => router.push(`/users/${userId}`),
   });

@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable, type DataTableColumn } from "../../../components/data-table";
 import { PageHeader } from "../../../components/page-header";
 import { BooleanBadge, ChannelBadge } from "../../../components/status-badge";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ConfirmButton } from "../../../components/confirm-button";
 import { SystemLink } from "../../../components/entity-links";
 import { IdChip } from "../../../components/id-chip";
@@ -40,6 +40,8 @@ const contactColumns: ReadonlyArray<DataTableColumn<UserContactRecord>> = [
     ),
   },
 ];
+
+const CHANNEL_LABEL: Record<ChannelType, string> = { email: "Email", sms: "SMS", telegram: "Telegram" };
 
 export default function UserDetailPage() {
   const params = useParams<{ id: string }>();
@@ -69,11 +71,16 @@ export default function UserDetailPage() {
 
 
   const setPreferenceMutation = useMutation({
+    meta: { error: "Could not change the preference" },
     mutationFn: (input: { channel: ChannelType; enabled: boolean }) => setUserPreference(userId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["user-preferences", userId] }),
+    onSuccess: (_response, { channel, enabled }) => {
+      toast.success(`${CHANNEL_LABEL[channel]} notifications ${enabled ? "on" : "off"}`);
+      return queryClient.invalidateQueries({ queryKey: ["user-preferences", userId] });
+    },
   });
 
   const deleteMutation = useMutation({
+    meta: { success: "User deleted", error: "Could not delete the user" },
     mutationFn: () => deleteUser(userId),
     onSuccess: () => router.push("/users"),
   });
@@ -93,7 +100,7 @@ export default function UserDetailPage() {
       void queryClient.invalidateQueries({ queryKey: ["user", userId] });
       void queryClient.invalidateQueries({ queryKey: ["users"] });
     },
-    onError: (error) => toast.error(errorMessage(error, "Could not save the name")),
+    onError: (error) => toast.error("Could not save the name", { description: errorMessage(error, "Please try again.") }),
   });
 
   const preferenceByChannel = new Map(
@@ -126,7 +133,7 @@ export default function UserDetailPage() {
               renameMutation.mutate();
             }}
           >
-            <div className="w-72">
+            <div className="w-full sm:w-72">
               <TextField
                 label="Name"
                 value={nameDraft ?? user.name ?? ""}
@@ -138,7 +145,7 @@ export default function UserDetailPage() {
             <Button type="submit" variant="secondary" disabled={nameDraft === null || renameMutation.isPending}>
               {renameMutation.isPending ? "Saving…" : "Save name"}
             </Button>
-            <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground sm:ml-auto">
               <IdChip id={user.id} />
             </div>
           </form>
@@ -171,9 +178,9 @@ export default function UserDetailPage() {
             const contact    = (contactsQuery.data?.data.items ?? []).find((item) => item.channel === channel);
             return (
               <li key={channel} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                   <ChannelBadge channel={channel} />
-                  <span className="text-sm text-muted-foreground">
+                  <span className="truncate text-sm text-muted-foreground">
                     {contact?.address ?? "no contact"}
                   </span>
                 </div>

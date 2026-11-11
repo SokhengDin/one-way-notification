@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { PageHeader } from "../../../components/page-header";
 import { emptyProviderForm, ProviderForm } from "../../../components/provider-form";
 import { addChannelProvider } from "../../../lib/api/providers";
@@ -13,6 +13,7 @@ export default function NewProviderPage() {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
+    meta: { inline: true },
     mutationFn: (submit: Parameters<React.ComponentProps<typeof ProviderForm>["onSubmit"]>[0]) =>
       addChannelProvider({
         channel:   submit.channel,

@@ -31,6 +31,7 @@ export default function NewUserContactPage() {
   const userName  = userQuery.data?.data.display_name;
 
   const mutation = useMutation({
+    meta: { success: "Contact added", inline: true },
     mutationFn: () =>
       addUserContact(userId, { channel, address: address || null, linked, verified }),
     onSuccess: () => router.push(`/users/${userId}`),

@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { providerKindSpec } from "@repo/schema";
 import { Card } from "../../../components/card";
 import { ConfirmButton } from "../../../components/confirm-button";
@@ -29,6 +29,7 @@ export default function ProviderDetailPage() {
   const provider = providerQuery.data?.data;
 
   const updateMutation = useMutation({
+    meta: { inline: true },
     mutationFn: (submit: Parameters<React.ComponentProps<typeof ProviderForm>["onSubmit"]>[0]) =>
       updateChannelProvider(providerId, {
         name:      submit.name,
@@ -45,6 +46,7 @@ export default function ProviderDetailPage() {
   });
 
   const deleteMutation = useMutation({
+    meta: { error: "Could not delete the provider" },
     mutationFn: () => deleteChannelProvider(providerId),
     onSuccess:  () => {
       toast.success("Provider deleted");

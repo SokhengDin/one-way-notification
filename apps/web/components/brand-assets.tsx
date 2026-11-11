@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ImageIcon, Upload } from "lucide-react";
 import { useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ASSET_KINDS, MAX_ASSET_BYTES, type AssetKind, type BrandAssetRecord } from "@repo/schema";
 import { cn } from "@/lib/utils";
 import { assetFileUrl, deleteAsset, listAssets, putAsset, readFileAsDataUrl } from "../lib/api/assets";

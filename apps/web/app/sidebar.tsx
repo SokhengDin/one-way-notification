@@ -1,61 +1,19 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import {
-  Bell,
-  Building2,
-  FileStack,
-  Inbox,
-  LayoutDashboard,
-  LogOut,
-  Radio,
-  Users,
-} from "lucide-react";
+import { Bell, LogOut, Server, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { useEffect } from "react";
+import { Avatar } from "../components/avatar";
 import { getMe, signOut } from "../lib/api/auth";
 import { getDeliveryQueue } from "../lib/api/deliveries";
+import { isActive, NAV, type NavItem } from "../lib/nav";
 import { useMounted } from "../lib/use-mounted";
-
-interface NavItem {
-  readonly label: string;
-  readonly href: string;
-  readonly icon?: ComponentType<{ className?: string }>;
-  readonly badge?: "queue";
-}
-
-interface NavSection {
-  readonly label: string;
-  readonly href?: string;
-  readonly icon?: ComponentType<{ className?: string }>;
-  readonly items?: ReadonlyArray<NavItem>;
-}
-
-const SECTIONS: ReadonlyArray<NavSection> = [
-  {
-    label: "Monitor",
-    icon: LayoutDashboard,
-    items: [
-      { label: "Overview", href: "/", icon: LayoutDashboard },
-      { label: "Deliveries", href: "/deliveries", icon: Inbox, badge: "queue" },
-      { label: "Notifications", href: "/notifications", icon: Bell },
-    ],
-  },
-  {
-    label: "Configure",
-    icon: FileStack,
-    items: [
-      { label: "Templates", href: "/notifications/templates", icon: FileStack },
-      { label: "Providers", href: "/providers", icon: Radio },
-      { label: "External systems", href: "/external-systems", icon: Building2 },
-      { label: "Users", href: "/users", icon: Users },
-    ],
-  },
-];
+import { cn } from "../lib/utils";
 
 /** Failed deliveries in the last hour, or what's waiting to go out. */
-function QueueBadge() {
+function QueueBadge({ active }: { active: boolean }) {
   const query = useQuery({
     queryKey:        ["delivery-queue"],
     queryFn:         getDeliveryQueue,
@@ -66,7 +24,7 @@ function QueueBadge() {
   if (!queue) return null;
   if (queue.failed_last_hour > 0) {
     return (
-      <span className="ml-auto rounded-full bg-destructive px-1.5 text-[11px] font-semibold text-white tabular-nums" title="Failed in the last hour">
+      <span className="ml-auto rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white tabular-nums" title="Failed in the last hour">
         {queue.failed_last_hour}
       </span>
     );
@@ -74,93 +32,148 @@ function QueueBadge() {
   const waiting = queue.pending + queue.retrying;
   if (waiting === 0) return null;
   return (
-    <span className="ml-auto rounded-full bg-sidebar-accent px-1.5 text-[11px] text-sidebar-foreground/80 tabular-nums" title="Queued or retrying">
+    <span
+      className={cn(
+        "ml-auto rounded-full px-1.5 text-[11px] tabular-nums",
+        active ? "bg-white/20 text-white" : "bg-sidebar-accent text-sidebar-foreground",
+      )}
+      title="Queued or retrying"
+    >
       {waiting}
     </span>
   );
 }
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/";
-  // /notifications/templates is its own item, not part of "Notifications"
-  if (href === "/notifications" && pathname.startsWith("/notifications/templates")) return false;
-  return pathname === href || pathname.startsWith(`${href}/`);
-}
-
 function NavLink({ label, href, icon: Icon, badge }: NavItem) {
   const pathname = usePathname();
-  const active = isActive(pathname, href);
+  const active   = isActive(pathname, href);
 
   return (
     <Link
       href={href}
-      className={`flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors",
         active
-          ? "bg-sidebar-primary/15 font-medium text-sidebar-primary"
-          : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-      }`}
+          ? "bg-sidebar-primary font-medium text-sidebar-primary-foreground"
+          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+      )}
     >
-      {Icon && <Icon className="size-4 shrink-0" />}
-      {label}
-      {badge === "queue" && <QueueBadge />}
+      <Icon className={cn("size-4 shrink-0", active ? "text-white" : "text-sidebar-muted")} aria-hidden />
+      <span className="truncate">{label}</span>
+      {badge === "queue" && <QueueBadge active={active} />}
     </Link>
   );
 }
 
 function Account() {
-  const query = useQuery({ queryKey: ["me"], queryFn: getMe, staleTime: 5 * 60_000 });
+  const query   = useQuery({ queryKey: ["me"], queryFn: getMe, staleTime: 5 * 60_000 });
   const mounted = useMounted();
   const admin   = mounted ? query.data?.data : undefined;
   return (
-    <div className="mt-auto flex items-center gap-2.5 border-t border-sidebar-border px-3 pt-4">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-foreground">
-        {admin ? admin.name.split(/\s+/).map((part) => part[0]).slice(0, 2).join("").toUpperCase() : ""}
-      </span>
-      <div className="min-w-0 flex-1 leading-tight">
-        <div className="truncate text-sm font-medium text-sidebar-foreground">{admin?.name ?? " "}</div>
-        <div className="truncate text-xs text-sidebar-foreground/50">{admin?.email ?? " "}</div>
+    <div className="space-y-1 border-t border-sidebar-border p-3">
+      <div className="flex items-center gap-2.5 rounded-md px-2 py-2">
+        <Avatar name={admin?.name} size="sm" className="ring-2 ring-sidebar-accent" />
+        <span className="min-w-0 flex-1 leading-tight">
+          <span className="block truncate text-sm font-medium text-white">{admin?.name ?? " "}</span>
+          <span className="block truncate text-[11px] text-sidebar-muted">{admin?.email ?? " "}</span>
+        </span>
       </div>
       <button
         type="button"
         onClick={() => void signOut()}
-        title="Sign out"
-        aria-label="Sign out"
-        className="rounded-md p-1.5 text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+        className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-white"
       >
-        <LogOut className="size-4" />
+        <LogOut className="size-4" aria-hidden />
+        Sign out
       </button>
     </div>
   );
 }
 
-export function Sidebar() {
+function Brand() {
   return (
-    <nav className="sticky top-0 flex h-screen w-60 shrink-0 flex-col gap-6 overflow-y-auto bg-sidebar px-3 py-6 text-sidebar-foreground">
-      <div className="flex items-center gap-2 px-3">
-        <div className="flex size-7 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-          <Bell className="size-4" />
+    <div className="flex items-center gap-2.5">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-white shadow-sm">
+        <Bell className="size-4.5" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-white">one-way-notification</div>
+        <div className="flex items-center gap-1 truncate text-[11px] text-sidebar-muted">
+          <Server className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">admin console</span>
         </div>
-        <span className="text-sm font-semibold tracking-tight">one-way-notification</span>
       </div>
-      <div className="flex flex-col gap-4">
-        {SECTIONS.map((section) => (
-          <div key={section.label} className="flex flex-col gap-1">
-            {section.href ? (
-              <NavLink label={section.label} href={section.href} icon={section.icon} />
-            ) : (
-              <>
-                <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
-                  {section.label}
-                </div>
-                {section.items?.map((item) => (
-                  <NavLink key={item.href} {...item} />
-                ))}
-              </>
-            )}
+    </div>
+  );
+}
+
+function SidebarBody({ onClose }: { onClose?: () => void }) {
+  return (
+    <>
+      <div className="flex items-center gap-2 px-4 py-5">
+        <Brand />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close menu"
+            className="ml-auto rounded-md p-1.5 text-sidebar-muted hover:bg-sidebar-accent hover:text-white"
+          >
+            <X className="size-5" />
+          </button>
+        )}
+      </div>
+      <nav aria-label="Main" className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+        {NAV.map(({ group, items }) => (
+          <div key={group}>
+            <div className="px-2 pb-1.5 text-[11px] font-semibold tracking-wider text-sidebar-label uppercase">{group}</div>
+            <div className="space-y-0.5">
+              {items.map((item) => <NavLink key={item.href} {...item} />)}
+            </div>
           </div>
         ))}
-      </div>
+      </nav>
       <Account />
-    </nav>
+    </>
+  );
+}
+
+/** Dark navy sidebar, as in file-vault. Always shown from `lg` up. */
+export function Sidebar() {
+  return (
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
+      <SidebarBody />
+    </aside>
+  );
+}
+
+/** The same navigation as a drawer below `lg`, opened from the top bar. */
+export function MobileNav({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+
+  // close after navigating
+  useEffect(() => { onClose(); }, [pathname, onClose]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+      <div className="backdrop-in absolute inset-0 bg-zinc-950/50" onClick={onClose} aria-hidden />
+      <aside className="drawer-in absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-sidebar text-sidebar-foreground shadow-xl">
+        <SidebarBody onClose={onClose} />
+      </aside>
+    </div>
   );
 }
