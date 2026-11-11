@@ -39,6 +39,15 @@ async function setup(options: { email?: string | null; name?: string } = {}) {
 }
 
 async function notify(systemId: string, userId: string, extra: Record<string, unknown> = {}) {
+  // a system only notifies its own users: put the user under it
+  await testSql`
+    INSERT INTO external_user_links (external_system_id, external_user_id, user_id)
+    SELECT ${systemId}, ${userId}, ${userId}
+    WHERE NOT EXISTS (
+      SELECT 1 FROM external_user_links
+      WHERE external_system_id = ${systemId} AND user_id = ${userId} AND deleted_at IS NULL
+    )
+  `;
   const res = await api("POST", "/api/notification", {
     external_system_id: systemId,
     user_id:            userId,

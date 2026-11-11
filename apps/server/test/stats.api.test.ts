@@ -6,7 +6,7 @@ beforeEach(resetDb);
 // ---------- fixtures (direct SQL: deliveries have no create endpoint) ----------
 
 async function system(name: string) {
-  const [row] = await testSql`INSERT INTO external_systems (name, api_key) VALUES (${name}, ${`k-${name}`}) RETURNING id`;
+  const [row] = await testSql`INSERT INTO external_systems (name) VALUES (${name}) RETURNING id`;
   return row.id as string;
 }
 

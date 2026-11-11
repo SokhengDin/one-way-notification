@@ -17,6 +17,7 @@ import { DeliveriesApiHandlers } from "./domain/delivery/delivery.http";
 import { DeliveryWorkerLive } from "./domain/delivery/delivery.worker";
 import { SenderRegistry } from "./domain/delivery/senders";
 import { AuthApiHandlers } from "./domain/auth/auth.http";
+import { ApiKeysApiHandlers } from "./domain/api-keys/api-keys.http";
 import { AuthMiddlewareLive } from "./domain/auth/auth.middleware";
 import { Auth } from "./domain/auth/auth";
 import { AdminBootstrapLive } from "./domain/auth/auth.bootstrap";
@@ -44,6 +45,7 @@ export const makeAppRoutes = (
       StatsApiHandlers,
       DeliveriesApiHandlers,
       AuthApiHandlers,
+      ApiKeysApiHandlers,
       SystemApiHandlers,
     ]),
     Layer.provide(senders),

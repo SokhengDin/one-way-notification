@@ -100,7 +100,7 @@ const DAY  = 86_400_000;
 
 await sql.begin(async (tx) => {
   const systems = await tx`
-    INSERT INTO external_systems ${tx(SYSTEMS.map((s) => ({ name: s.name, api_key: `demo-${s.name.toLowerCase().replace(/\W+/g, "-")}` })))}
+    INSERT INTO external_systems ${tx(SYSTEMS.map((s) => ({ name: s.name })))}
     RETURNING id, name
   `;
   const systemId = new Map(systems.map((row: { id: string; name: string }) => [row.name, row.id]));
@@ -161,6 +161,11 @@ await sql.begin(async (tx) => {
       .map((user, i) => ({ external_system_id: systemId.get(system.name), external_user_id: `${system.name.split(" ")[1]!.toLowerCase()}-${1000 + i}`, user_id: user.id })),
   );
   await tx`INSERT INTO external_user_links ${tx(links)}`;
+  // a system only notifies its own users
+  const usersOf = new Map(SYSTEMS.map((system) => [
+    system.name,
+    links.filter((link) => link.external_system_id === systemId.get(system.name)).map((link) => ({ id: link.user_id })),
+  ]));
 
   const notifications: Array<Record<string, unknown>> = [];
   const deliveries:    Array<Record<string, unknown>> = [];
@@ -179,7 +184,7 @@ await sql.begin(async (tx) => {
       const spec:   EventSpec  = weighted(system.events);
       const notificationId     = crypto.randomUUID();
 
-      const userId = pick(users).id;
+      const userId = pick(usersOf.get(system.name)!).id;
       notifications.push({
         id:                 notificationId,
         external_system_id: systemId.get(system.name),

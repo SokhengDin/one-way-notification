@@ -1,7 +1,8 @@
-import { Api, ok } from "@repo/schema";
-import { Effect, Layer } from "effect";
+import { Api, ok, Unauthorized } from "@repo/schema";
+import { Effect, Layer, Option } from "effect";
 import { HttpServerRequest } from "effect/unstable/http";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { ApiKeys } from "../api-keys/api-keys";
 import { Notifications } from "./notifications";
 
 export const NotificationsApiHandlers = HttpApiBuilder.group(
@@ -9,6 +10,7 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
   "notifications",
   Effect.fn(function* (handlers) {
     const notifications = yield* Notifications;
+    const apiKeys       = yield* ApiKeys;
 
     return handlers
       // ---------- notification_templates ----------
@@ -57,9 +59,17 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
           // middleware only lets a key-less request through for a signed-in
           // administrator (the dashboard's "New notification").
           const request = yield* HttpServerRequest.HttpServerRequest;
-          const apiKey  = (request.headers as Readonly<Record<string, string | undefined>>)["x-api-key"];
+          const headers = request.headers as Readonly<Record<string, string | undefined>>;
+          const apiKey  = headers["x-api-key"];
           if (apiKey !== undefined) {
-            yield* notifications.verifySystemApiKey(payload.external_system_id, apiKey);
+            const ip     = headers["x-forwarded-for"]?.split(",")[0]?.trim() || Option.getOrNull(request.remoteAddress);
+            const system = yield* apiKeys.authenticateKey(apiKey.trim(), ip ?? null).pipe(
+              Effect.mapError(() => new Unauthorized({ message: "Could not check the API key. Try again." })),
+            );
+            // unknown, revoked, expired and another system's key all answer the same
+            if (system === null || system !== payload.external_system_id) {
+              return yield* new Unauthorized({ message: "X-Api-Key is not valid for this external system" });
+            }
           }
           const data = yield* notifications.addNotification(payload);
           return ok(data, 201, "Created");
@@ -82,4 +92,4 @@ export const NotificationsApiHandlers = HttpApiBuilder.group(
           .pipe(Effect.map((data) => ok(data))),
       );
   }),
-).pipe(Layer.provide(Notifications.layer));
+).pipe(Layer.provide([Notifications.layer, ApiKeys.layer]));

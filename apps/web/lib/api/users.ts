@@ -1,7 +1,7 @@
 import type { ChannelType } from "@repo/schema";
 import { runApi } from "../api-client";
 
-export const listUsers = (query: { skip?: number; limit?: number; q?: string }) =>
+export const listUsers = (query: { skip?: number; limit?: number; q?: string; external_system_id?: string }) =>
   runApi((client) => client.users.listUsers({ query }));
 
 export const addUser = (payload: { name?: string | null } = {}) =>

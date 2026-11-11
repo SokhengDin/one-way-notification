@@ -11,10 +11,7 @@ export const listExternalSystems = (query: {
     client["external-systems"].listExternalSystems({ query }),
   );
 
-export const addExternalSystem = (payload: {
-  name: string;
-  api_key: string;
-}) =>
+export const addExternalSystem = (payload: { name: string }) =>
   runApi((client) =>
     client["external-systems"].addExternalSystem({ payload }),
   );
@@ -26,7 +23,7 @@ export const getExternalSystemById = (id: string) =>
 
 export const updateExternalSystem = (
   id: string,
-  payload: { name?: string; api_key?: string },
+  payload: { name?: string },
 ) =>
   runApi((client) =>
     client["external-systems"].updateExternalSystem({

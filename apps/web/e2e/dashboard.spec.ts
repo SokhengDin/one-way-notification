@@ -54,12 +54,21 @@ async function selectOption(page: Page, label: string, option: string) {
 test("create an external system", async ({ page }) => {
   await page.goto("/external-systems/new");
   await page.getByLabel("Name").fill(SYSTEM_NAME);
-  await page.getByLabel("API key").fill(`key-${Date.now()}`);
   await page.getByRole("button", { name: "Create system" }).click();
 
-  await expect(page).toHaveURL(/\/external-systems\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/external-systems\/[0-9a-f-]{36}\?issue=1$/);
   await expect(page.getByRole("heading", { name: SYSTEM_NAME })).toBeVisible();
   systemPath = new URL(page.url()).pathname;
+
+  // "Issue key" opens by itself; the key is shown once and must be acknowledged
+  await page.getByRole("button", { name: "Issue key", exact: true }).last().click();
+  const secret = page.getByTestId("issued-api-key");
+  await expect(secret).toHaveText(/^ownk_[0-9A-Za-z]{8}_[0-9A-Za-z]{49}$/);
+  const done = page.getByRole("button", { name: "Done" });
+  await expect(done).toBeDisabled();
+  await page.getByLabel("I've stored this key somewhere safe").check();
+  await done.click();
+  await expect(page.getByText("Active", { exact: true })).toBeVisible();
 
   for (const kind of ["logo", "logo_dark", "icon", "email_header"]) {
     await expect(slot(page, kind)).toContainText("Nothing uploaded.");

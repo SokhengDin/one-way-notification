@@ -29,9 +29,9 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       error: ExternalSystemRepoError,
     }),
     HttpApiEndpoint.post("addExternalSystem", "/external-system", {
+      // API keys are issued separately (POST /external-system/:id/api-key)
       payload: Schema.Struct({
         name: Schema.String,
-        api_key: Schema.String,
       }),
       success: ApiResponse(ExternalSystemRecord),
       error: [ExternalSystemConflict, ExternalSystemRepoError],
@@ -45,7 +45,6 @@ export class ExternalSystemsApiGroup extends HttpApiGroup.make(
       params: { id: Uuid },
       payload: Schema.Struct({
         name: Schema.optional(Schema.String),
-        api_key: Schema.optional(Schema.String),
       }),
       success: ApiResponse(ExternalSystemRecord),
       error: [

@@ -96,9 +96,17 @@ export default function NewNotificationPage() {
             onChange={(id) => {
               setExternalSystemId(id);
               setEventType("");
+              // users belong to a system: a new system means picking again
+              setUserId("");
             }}
           />
-          <UserPicker value={userId} onChange={(id) => setUserId(id)} />
+          <UserPicker
+            key={externalSystemId}
+            value={userId}
+            onChange={(id) => setUserId(id)}
+            externalSystemId={externalSystemId || undefined}
+            hint={externalSystemId ? "Only users under this system can be notified by it." : "Pick the external system first."}
+          />
           {externalSystemId && events.length === 0 && !templatesQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">
               This system has no templates yet, so nothing could be sent. Create a template first.

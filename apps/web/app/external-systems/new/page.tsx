@@ -12,12 +12,11 @@ import { addExternalSystem } from "../../../lib/api/external-systems";
 export default function NewExternalSystemPage() {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [apiKey, setApiKey] = useState("");
 
   const mutation = useMutation({
-    mutationFn: () => addExternalSystem({ name, api_key: apiKey }),
+    mutationFn: () => addExternalSystem({ name: name.trim() }),
     meta: { success: "External system created", inline: true },
-    onSuccess: (response) => router.push(`/external-systems/${response.data.id}`),
+    onSuccess: (response) => router.push(`/external-systems/${response.data.id}?issue=1`),
   });
 
   return (
@@ -36,13 +35,12 @@ export default function NewExternalSystemPage() {
               {mutation.error instanceof Error ? mutation.error.message : "Failed to create system."}
             </p>
           )}
-          <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} required />
           <TextField
-            label="API key"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
+            label="Name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             required
-            hint="Shared secret the external system will authenticate with."
+            hint="The service that will send through this API. You'll issue its API key next."
           />
           <div>
             <Button type="submit" disabled={mutation.isPending}>

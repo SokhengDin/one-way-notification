@@ -7,7 +7,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { Api } from "@repo/schema";
 import { OpenApi } from "effect/unstable/httpapi";
-import { api, createSystem, createTemplate, createUser, resetDb } from "./support";
+import { api, createSystem, createTemplate, createUser, linkUser, resetDb } from "./support";
 
 const NIL_UUID = "00000000-0000-4000-8000-000000000000";
 const isIsoDate = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value));
@@ -48,10 +48,11 @@ describe("users", () => {
 
 describe("external systems", () => {
   test("create, get, update, list, delete", async () => {
-    const created = await api("POST", "/api/external-system", { name: "shop", api_key: "k1" });
+    const created = await api("POST", "/api/external-system", { name: "shop" });
     expect(created.status).toBe(200);
     const system = created.json.data;
-    expect(system).toMatchObject({ name: "shop", api_key: "k1" });
+    expect(system).toMatchObject({ name: "shop", active_api_keys: 0 });
+    expect(system).not.toHaveProperty("api_key");
 
     expect((await api("GET", `/api/external-system/${system.id}`)).json.data.name).toBe("shop");
 
@@ -66,7 +67,7 @@ describe("external systems", () => {
 
   test("duplicate name → 409", async () => {
     await createSystem("dup");
-    expect((await api("POST", "/api/external-system", { name: "dup", api_key: "other" })).status).toBe(409);
+    expect((await api("POST", "/api/external-system", { name: "dup" })).status).toBe(409);
   });
 
   test("user links: add", async () => {
@@ -89,6 +90,7 @@ describe("notifications", () => {
   test("create with a JSON payload, get and list", async () => {
     const system  = await createSystem();
     const user    = await createUser("Dara");
+    await linkUser(system.id, user.id);
     await createTemplate({ external_system_id: system.id, event_type: "order.shipped" });
     const payload = { order: { id: 7, items: ["a", "b"] }, flag: true };
     const created = await api("POST", "/api/notification", {
@@ -114,6 +116,7 @@ describe("notifications", () => {
   test("idempotency key returns the original notification", async () => {
     const system = await createSystem();
     const user   = await createUser();
+    await linkUser(system.id, user.id);
     await createTemplate({ external_system_id: system.id, event_type: "e" });
     const body   = {
       external_system_id: system.id, user_id: user.id, event_type: "e", payload: { n: 1 }, idempotency_key: "k-1",
@@ -131,6 +134,8 @@ describe("notifications", () => {
   test("idempotency keys are scoped per external system", async () => {
     const [a, b] = [await createSystem(), await createSystem()];
     const user   = await createUser();
+    await linkUser(a.id, user.id);
+    await linkUser(b.id, user.id);
     await createTemplate({ external_system_id: a.id, event_type: "e" });
     await createTemplate({ external_system_id: b.id, event_type: "e" });
     const send = (system: string) =>
@@ -144,11 +149,25 @@ describe("notifications", () => {
   test("no template for the event → 422, nothing stored", async () => {
     const system = await createSystem();
     const user   = await createUser();
+    await linkUser(system.id, user.id);
     const res    = await api("POST", "/api/notification", {
       external_system_id: system.id, user_id: user.id, event_type: "nobody.listens", payload: {},
     });
     expect(res.status).toBe(422);
     expect(res.json.message ?? JSON.stringify(res.json)).toContain("nobody.listens");
+    expect((await api("GET", "/api/notification")).json.data.total).toBe(0);
+  });
+
+  test("a user that isn't under the system → 422, nothing stored", async () => {
+    const [mine, theirs] = [await createSystem(), await createSystem()];
+    const user = await createUser();
+    await linkUser(theirs.id, user.id);
+    await createTemplate({ external_system_id: mine.id, event_type: "e" });
+    const res = await api("POST", "/api/notification", {
+      external_system_id: mine.id, user_id: user.id, event_type: "e", payload: {},
+    });
+    expect(res.status).toBe(422);
+    expect(res.json.message).toContain("isn't linked to this external system");
     expect((await api("GET", "/api/notification")).json.data.total).toBe(0);
   });
 
@@ -202,5 +221,21 @@ describe("system", () => {
     expect(paths).toContain("/api/notification-template/{id}/render");
     expect(paths).toContain("/api/external-system/{id}/asset/{kind}");
     expect(paths).toContain("/api/asset/{id}");
+  });
+});
+
+describe("users under an external system", () => {
+  test("the user list can be limited to one system's users", async () => {
+    const [a, b] = [await createSystem(), await createSystem()];
+    const [mine, theirs, both] = [await createUser("Mine"), await createUser("Theirs"), await createUser("Both")];
+    await linkUser(a.id, mine.id);
+    await linkUser(b.id, theirs.id);
+    await linkUser(a.id, both.id);
+    await linkUser(b.id, both.id);
+    const names = async (systemId: string) =>
+      ((await api("GET", `/api/user?external_system_id=${systemId}`)).json.data.items as Array<{ name: string }>).map((u) => u.name).sort();
+    expect(await names(a.id)).toEqual(["Both", "Mine"]);
+    expect(await names(b.id)).toEqual(["Both", "Theirs"]);
+    expect((await api("GET", "/api/user")).json.data.total).toBe(3);
   });
 });

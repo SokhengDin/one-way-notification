@@ -173,10 +173,21 @@ export function makeSqlNotificationRepo(
           }
         }
 
-        const users = yield* sql<{ id: string }>`
-          SELECT id FROM users WHERE id = ${input.user_id} AND deleted_at IS NULL
+        // A user belongs to the systems it is linked to: a system can only
+        // notify its own users, never another system's.
+        const users = yield* sql<{ id: string; linked: boolean }>`
+          SELECT u.id,
+                 EXISTS (
+                   SELECT 1 FROM external_user_links l
+                   WHERE l.user_id = u.id
+                     AND l.external_system_id = ${input.external_system_id}
+                     AND l.deleted_at IS NULL
+                 ) AS linked
+          FROM users u
+          WHERE u.id = ${input.user_id} AND u.deleted_at IS NULL
         `.pipe(mapSqlError("planDeliveries"));
         if (users.length === 0) return { _tag: "UnknownUser" } as const;
+        if (!users[0]!.linked) return { _tag: "UserNotInSystem" } as const;
 
         // "" = every channel
         const channels = (input.channels ?? []).join(",");

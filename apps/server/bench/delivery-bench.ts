@@ -103,7 +103,7 @@ const hash = await Bun.password.hash("bench-admin-password");
 await sql`INSERT INTO admins (email, name, password_hash) VALUES ('bench@local', 'Bench', ${hash})`;
 token = (await api("POST", "/api/auth/login", { email: "bench@local", password: "bench-admin-password" })).json.data.token;
 
-const system = (await api("POST", "/api/external-system", { name: "Bench", api_key: "bench-key" })).json.data;
+const system = (await api("POST", "/api/external-system", { name: "Bench" })).json.data;
 await api("POST", "/api/notification-template", {
   external_system_id: system.id, event_type: "bench.event", channel: "email",
   subject: "Hello {{name}}", template: "<p>Order {{order}}</p>",
@@ -125,6 +125,7 @@ for (let i = 0; i < USERS; i++) {
   const user = (await api("POST", "/api/user", { name: `Bench ${i}` })).json.data;
   await api("POST", `/api/user/${user.id}/contacts`, { channel: "email", address: `u${i}@bench.test`, linked: true, verified: true });
   if (i % 2 === 0) await api("POST", `/api/user/${user.id}/contacts`, { channel: "sms", address: `+3360000${String(1000 + i)}`, linked: true, verified: true });
+  await api("POST", `/api/external-system/${system.id}/link`, { user_id: user.id, external_user_id: `bench-${i}` });
   userIds.push(user.id);
 }
 

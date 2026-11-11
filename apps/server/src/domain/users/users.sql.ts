@@ -62,6 +62,7 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
     const { skip, limit } = normalizePagination(input);
     const q       = input.q?.trim() ?? "";
     const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const system  = input.external_system_id ?? null;
 
     const rows = yield* sql<UserRecord & { readonly total_count: number }>`
       SELECT u.id, l.name, l.email, l.display_name, l.channels, u.created_at, u.updated_at, u.deleted_at,
@@ -71,6 +72,10 @@ export function makeSqlUsersRepo(sql: SqlClient): UserRepoService {
       WHERE u.deleted_at IS NULL
         AND (${q} = '' OR l.display_name ILIKE ${pattern} OR l.email ILIKE ${pattern}
              OR l.external_user_id ILIKE ${pattern} OR u.id::text = ${q})
+        AND (${system}::uuid IS NULL OR EXISTS (
+          SELECT 1 FROM external_user_links el
+          WHERE el.user_id = u.id AND el.external_system_id = ${system}::uuid AND el.deleted_at IS NULL
+        ))
       ORDER BY u.created_at DESC
       LIMIT ${limit} OFFSET ${skip}
     `.pipe(mapSqlError("listUsers"));

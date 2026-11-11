@@ -176,9 +176,23 @@ export { sql as testSql };
 let counter = 0;
 
 export async function createSystem(name = `system-${++counter}`) {
-  const res = await api("POST", "/api/external-system", { name, api_key: `key-${name}` });
+  const res = await api("POST", "/api/external-system", { name });
   if (res.status !== 200) throw new Error(`createSystem failed: ${res.status} ${JSON.stringify(res.json)}`);
   return res.json.data as { id: string; name: string };
+}
+
+/** Issues an API key from the dashboard API; returns the secret and its record. */
+export async function issueKey(systemId: string, fields: { name?: string; expires_in_days?: number } = {}) {
+  const res = await api("POST", `/api/external-system/${systemId}/api-key`, { name: "Test key", expires_in_days: 30, ...fields });
+  if (res.status !== 200) throw new Error(`issueKey failed: ${res.status} ${JSON.stringify(res.json)}`);
+  return res.json.data as { secret: string; key: { id: string; status: string; prefix: string; last_four: string } };
+}
+
+/** Puts a user under an external system (a system only notifies its own users). */
+export async function linkUser(systemId: string, userId: string, externalUserId = `ext-${++counter}`) {
+  const res = await api("POST", `/api/external-system/${systemId}/link`, { user_id: userId, external_user_id: externalUserId });
+  if (res.status !== 200) throw new Error(`linkUser failed: ${res.status} ${JSON.stringify(res.json)}`);
+  return res.json.data;
 }
 
 export async function createUser(name?: string) {
