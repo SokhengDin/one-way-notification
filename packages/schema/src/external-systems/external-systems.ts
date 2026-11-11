@@ -5,7 +5,8 @@ export class ExternalSystemRecord extends Schema.Class<ExternalSystemRecord>(
 )({
   id: Schema.String,
   name: Schema.String,
-  api_key: Schema.String,
+  /** keys that work right now (issued from the dashboard, see ApiKeyRecord) */
+  active_api_keys: Schema.Int,
   // activity, for the list
   template_count: Schema.Int,
   user_count: Schema.Int,

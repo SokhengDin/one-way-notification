@@ -33,11 +33,16 @@ function useRemembered(options: ReadonlyArray<ComboboxOption>, value: string) {
   return { merged, remember: setRemembered };
 }
 
-export function UserPicker({ label = "User", value, onChange, placeholder = "Search by name or email…", hint, error, hideLabel }: PickerProps) {
+export function UserPicker({
+  label = "User", value, onChange, placeholder = "Search by name or email…", hint, error, hideLabel, externalSystemId,
+}: PickerProps & {
+  /** only offer the users under this external system */
+  readonly externalSystemId?: string;
+}) {
   const [search, setSearch] = useState("");
   const query = useQuery({
-    queryKey: ["users", { q: search, limit: 20 }],
-    queryFn:  () => listUsers({ skip: 0, limit: 20, q: search || undefined }),
+    queryKey: ["users", { q: search, limit: 20, external_system_id: externalSystemId }],
+    queryFn:  () => listUsers({ skip: 0, limit: 20, q: search || undefined, external_system_id: externalSystemId || undefined }),
   });
   const options = (query.data?.data.items ?? []).map((user) => ({
     value:       user.id,
@@ -59,7 +64,7 @@ export function UserPicker({ label = "User", value, onChange, placeholder = "Sea
       search={search}
       onSearchChange={setSearch}
       placeholder={placeholder}
-      emptyMessage="No users match."
+      emptyMessage={externalSystemId ? "No users under this system match." : "No users match."}
       isLoading={query.isLoading}
       hint={hint}
       error={error}

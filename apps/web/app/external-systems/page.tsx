@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { Building2 } from "lucide-react";
+import { Building2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import type { ExternalSystemRecord } from "@repo/schema";
@@ -31,6 +31,15 @@ const columns: ReadonlyArray<DataTableColumn<ExternalSystemRecord>> = [
         {row.name}
       </Link>
     ),
+  },
+  {
+    header: "API keys",
+    cell: (row) =>
+      row.active_api_keys === 0 ? (
+        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400" title="No working key: this system can't send">
+          <TriangleAlert className="size-3.5" /> None
+        </span>
+      ) : count(row.active_api_keys, "key"),
   },
   { header: "Templates", cell: (row) => count(row.template_count, "template") },
   { header: "Linked users", cell: (row) => count(row.user_count, "user") },

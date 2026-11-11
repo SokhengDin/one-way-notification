@@ -23,6 +23,8 @@ export class UsersApiGroup extends HttpApiGroup.make("users")
         ...PaginationQuery,
         // matches name, email or linked external user id (case-insensitive)
         q: Schema.optional(Schema.String),
+        // only the users under this external system
+        external_system_id: Schema.optional(Uuid),
       },
       success: ApiResponse(PaginatedData(UserRecord)),
       error: UserRepoError,

@@ -15,12 +15,10 @@ import type {
 
 export interface AddExternalSystem {
   readonly name: string;
-  readonly api_key: string;
 }
 
 export interface UpdateExternalSystem {
   readonly name?: string;
-  readonly api_key?: string;
 }
 
 export interface ListExternalSystemsInput extends PaginationInput {

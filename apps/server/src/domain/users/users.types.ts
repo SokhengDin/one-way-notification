@@ -22,6 +22,7 @@ export interface UpdateUser {
 
 export interface ListUsersInput extends PaginationInput {
   readonly q?: string;
+  readonly external_system_id?: string;
 }
 
 export interface AddUserPreference {

@@ -35,6 +35,12 @@ database on the Docker host. To run one in compose, uncomment `postgres` (and
 `depends_on` under `backend`) in `docker-compose.yml` and set `DB_HOST=postgres`.
 Mailpit (test SMTP inbox) and an extra delivery worker are there too, commented out.
 
+Create or reset an administrator in Docker (prompts for the password):
+
+```bash
+docker exec -it <api-container> bun db/create-admin.ts you@example.com "Your Name"
+```
+
 Serving the dashboard over plain HTTP on a server IP? Set `COOKIE_SECURE=false`,
 or the browser drops the session cookie. Behind HTTPS leave it `true`.
 
@@ -64,3 +70,28 @@ PORT=3001 bun run dev:web         # dashboard on :3001
 | `bun run file-vault:fake`             | in-memory file-vault on :3301 for local dev   |
 | `bun run assets:move-to-file-vault`   | move assets still in Postgres to file-vault   |
 | `bun run bench`                       | delivery throughput benchmark                 |
+
+## Sending from your systems
+
+Each external system (one of your services that sends through this API) gets
+its own API keys, issued from the dashboard: **External systems → your system
+→ API keys → Issue key**.
+
+- A key looks like `ownk_Ab12Cd34_…`. It is shown **once**; only its SHA-256 is
+  stored, so a lost key can't be recovered, only rolled.
+- Every key expires (1 day to 2 years, 90 days by default). The dashboard warns
+  14 days ahead. **Roll** issues a replacement and keeps the old key working
+  for a grace period (none, 1 h, 24 h or 7 days) while you deploy it.
+- **Revoke** stops a key immediately.
+- A system can only notify **its own users**: users linked to it
+  (`POST /api/external-system/:id/link`). Anyone else is refused with 422.
+
+```bash
+curl -X POST "$NOTIFY_API_URL/api/notification" \
+  -H "X-Api-Key: $NOTIFY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"external_system_id":"…","user_id":"…","event_type":"order.shipped","payload":{"order_id":"A-42"}}'
+```
+
+Keys made before this existed were moved over as hashed "legacy" keys with no
+expiry: they keep working, and the dashboard asks you to roll them.

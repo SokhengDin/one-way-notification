@@ -2,9 +2,10 @@
 
 import { errorMessage } from "../../../lib/errors";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import type { ExternalUserLinkRecord } from "@repo/schema";
+import { ApiKeysCard } from "../../../components/api-keys";
 import { BrandAssets } from "../../../components/brand-assets";
 import { Button } from "../../../components/button";
 import { ConfirmButton } from "../../../components/confirm-button";
@@ -45,8 +46,8 @@ export default function ExternalSystemDetailPage() {
   });
 
   const [name, setName] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
+  // arriving from "New external system": open "Issue key" straight away
+  const issueOnOpen = useSearchParams().get("issue") === "1";
 
   // reset the form whenever fresh data arrives (state adjusted during render,
   // not in an effect — see react.dev "you might not need an effect")
@@ -54,12 +55,11 @@ export default function ExternalSystemDetailPage() {
   if (systemQuery.data && systemQuery.data !== syncedFrom) {
     setSyncedFrom(systemQuery.data);
     setName(systemQuery.data.data.name);
-    setApiKey(systemQuery.data.data.api_key);
   }
 
   const updateMutation = useMutation({
     meta: { success: "External system saved", inline: true },
-    mutationFn: () => updateExternalSystem(systemId, { name, api_key: apiKey }),
+    mutationFn: () => updateExternalSystem(systemId, { name }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["external-system", systemId] }),
   });
 
@@ -115,19 +115,6 @@ export default function ExternalSystemDetailPage() {
             </p>
           )}
           <TextField label="Name" value={name} onChange={(event) => setName(event.target.value)} />
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <TextField
-                label="API key"
-                type={showApiKey ? "text" : "password"}
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-              />
-            </div>
-            <Button type="button" variant="secondary" onClick={() => setShowApiKey((value) => !value)}>
-              {showApiKey ? "Hide" : "Reveal"}
-            </Button>
-          </div>
           <div>
             <Button type="submit" disabled={updateMutation.isPending}>
               {updateMutation.isPending ? "Saving…" : "Save"}
@@ -135,6 +122,8 @@ export default function ExternalSystemDetailPage() {
           </div>
         </form>
       </Card>
+
+      <ApiKeysCard systemId={systemId} issueOnOpen={issueOnOpen} />
 
       <BrandAssets systemId={systemId} />
 

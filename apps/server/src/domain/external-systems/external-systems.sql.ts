@@ -25,7 +25,10 @@ export function makeSqlExternalSystemsRepo(
 
   // with a few counts, so the systems list says something useful
   const SYSTEM_COLUMNS = sql.literal(`
-    id, name, api_key, created_at, updated_at, deleted_at,
+    id, name, created_at, updated_at, deleted_at,
+    (SELECT count(*)::int FROM api_keys k
+      WHERE k.external_system_id = external_systems.id AND k.revoked_at IS NULL
+        AND (k.expires_at IS NULL OR k.expires_at > now()))                                   AS active_api_keys,
     (SELECT count(*)::int FROM notification_templates t
       WHERE t.external_system_id = external_systems.id AND t.deleted_at IS NULL)              AS template_count,
     (SELECT count(*)::int FROM external_user_links l
@@ -40,8 +43,8 @@ export function makeSqlExternalSystemsRepo(
   const addExternalSystem: ExternalSystemRepoService["addExternalSystem"] =
     Effect.fn("ExternalSystemsRepo.addExternalSystem")(function* (input) {
       const rows = yield* sql<ExternalSystemRecord>`
-        INSERT INTO external_systems (name, api_key)
-        VALUES (${input.name}, ${input.api_key})
+        INSERT INTO external_systems (name)
+        VALUES (${input.name})
         RETURNING ${SYSTEM_COLUMNS}
       `.pipe(
         Effect.catchReason(
@@ -49,7 +52,7 @@ export function makeSqlExternalSystemsRepo(
           "UniqueViolation",
           () =>
             new ExternalSystemConflict({
-              message: `A system with name "${input.name}" or that API key already exists`,
+              message: `A system named "${input.name}" already exists`,
             }),
           (_reasons, error) =>
             Effect.fail(toExternalSystemRepoError("addExternalSystem", error)),
@@ -104,7 +107,6 @@ export function makeSqlExternalSystemsRepo(
         UPDATE external_systems
         SET
           name = COALESCE(${input.name ?? null}, name),
-          api_key = COALESCE(${input.api_key ?? null}, api_key),
           updated_at = now()
         WHERE id = ${id} AND deleted_at IS NULL
         RETURNING ${SYSTEM_COLUMNS}
@@ -114,7 +116,7 @@ export function makeSqlExternalSystemsRepo(
           "UniqueViolation",
           () =>
             new ExternalSystemConflict({
-              message: `A system with name "${input.name}" or that API key already exists`,
+              message: `A system named "${input.name}" already exists`,
             }),
           (_reasons, error) =>
             Effect.fail(
